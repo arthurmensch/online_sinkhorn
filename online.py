@@ -68,13 +68,13 @@ def stochasic_sinkhorn_finite(x, y, eps, m, n_iter=100, step_size='sqrt'):
     n = x.shape[0]
     hatf = torch.full((n,), fill_value=-float('inf'))
     hatg = torch.full((n,), fill_value=-float('inf'))
-    avg_f = torch.zeros_like(hatf)
-    avg_g = torch.zeros_like(hatg)
+    af = torch.full((n,), fill_value=-float('inf'))
+    ag = torch.full((n,), fill_value=-float('inf'))
     distance = compute_distance(x, y)
     sum_eta = 0
     for i in range(0, n_iter):
         if step_size == 'sqrt':
-            eta = torch.tensor(1. / math.sqrt(i + 1))
+            eta = torch.tensor(1. / math.pow(i + 1, .5))
         elif step_size == 'constant':
             eta = torch.tensor(1.)
 
@@ -87,17 +87,24 @@ def stochasic_sinkhorn_finite(x, y, eps, m, n_iter=100, step_size='sqrt'):
         hatg += eps * torch.log(1 - eta)
         update = eps * math.log(eta) + logb * eps + g
         hatg[y_idx] = eps * torch.logsumexp(torch.cat([hatg[y_idx][None, :], update[None, :]], dim=0) / eps, dim=0)
+        new_f = evaluate_potential_finite(hatg, slice(None), distance, eps)
+        af = eps * torch.logsumexp(torch.cat([af[None, :], (new_f + eps * torch.log(eta))[None, :]], dim=0) / eps,
+                                   dim=0)
         # Update g
         x_idx, loga = sample_from_finite(x, m)
         f = evaluate_potential_finite(hatg, x_idx, distance, eps)
         hatf += eps * torch.log(1 - eta)
         update = eps * math.log(eta) + loga * eps + f
         hatf[x_idx] = eps * torch.logsumexp(torch.cat([hatf[x_idx][None, :], update[None, :]], dim=0) / eps, dim=0)
+        new_g = evaluate_potential_finite(hatf, slice(None), distance.transpose(0, 1), eps)
+        ag = eps * torch.logsumexp(torch.cat([ag[None, :], (new_g + eps * torch.log(eta))[None, :]], dim=0) / eps,
+                                   dim=0)
         sum_eta += eta
-    avg_g /= sum_eta
-    avg_f /= sum_eta
-    return (evaluate_potential_finite(hatg, slice(None), distance, eps), \
-            evaluate_potential_finite(hatf, slice(None), distance.transpose(0, 1), eps))
+    af -= torch.log(sum_eta) * eps
+    ag -= torch.log(sum_eta) * eps
+    f = evaluate_potential_finite(hatg, slice(None), distance, eps)
+    g = evaluate_potential_finite(hatf, slice(None), distance.transpose(0, 1), eps)
+    return f, g
 
 
 def sinkhorn(x, y, eps, n_iter=100):
@@ -121,16 +128,16 @@ def sinkhorn(x, y, eps, n_iter=100):
 
 def main():
     n = 10
-    m = 2
-    eps = 1
+    m = 5
+    eps = 1e-1
 
-    torch.manual_seed(10)
-    np.random.seed(10)
+    torch.manual_seed(100)
+    np.random.seed(100)
 
     y = torch.randn(n, 2)
     x = torch.randn((n, 2))
     print('===========================================True=====================================')
-    f, g = sinkhorn(x, y, eps=eps, n_iter=2000)
+    f, g = sinkhorn(x, y, eps=eps, n_iter=100)
     print(f.mean() + g.mean())
     # print('===========================================Stochastic=====================================')
     # torch.manual_seed(100)
@@ -140,8 +147,9 @@ def main():
     print('===========================================Finite stochastic=====================================')
     torch.manual_seed(100)
     np.random.seed(100)
-    smd_f_finite, smd_g_finite = stochasic_sinkhorn_finite(x, y, eps=eps, m=m, n_iter=2000, step_size='sqrt')
-    print((f - smd_f_finite), (g - smd_g_finite))
+    smd_f_finite, smd_g_finite = stochasic_sinkhorn_finite(x, y, eps=eps, m=m, n_iter=10000, step_size='sqrt')
+    print(f - smd_f_finite, g - smd_g_finite)
+    print((f - smd_f_finite).max() - (f - smd_f_finite).min() + (g - smd_g_finite).max() - (g - smd_g_finite).min())
     print(smd_f_finite.mean() + smd_g_finite.mean())
 
 
@@ -177,8 +185,10 @@ class Sampler():
 
 def sampling_sinkhorn(x_sampler, y_sampler, eps, m, grid, n_iter=100, step_size='sqrt'):
     hatf = torch.zeros(m * n_iter)
+    ahatf = torch.zeros(m * n_iter)
     posx = torch.zeros(m * n_iter, 2)
     hatg = torch.zeros(m * n_iter)
+    ahatg = torch.zeros(m * n_iter)
     posy = torch.zeros(m * n_iter, 2)
     w = 0
     fevals = []
@@ -197,6 +207,7 @@ def sampling_sinkhorn(x_sampler, y_sampler, eps, m, grid, n_iter=100, step_size=
         else:
             g = torch.zeros(m)
         hatg[:i * m] += eps * torch.log(1 - eta)
+        ahatg[:i * m] += eps * (torch.log(1 - eta))
         hatg[i * m:(i + 1) * m] = eps * math.log(eta) + logb * eps + g
         posy[i * m:(i + 1) * m] = y_
 
