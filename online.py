@@ -104,7 +104,8 @@ def stochasic_sinkhorn_finite(x, y, fref, gref, eps, m, n_iter=100, step_size='s
         hatg[y_idx] = eps * torch.logsumexp(torch.cat([hatg[y_idx][None, :], update[None, :]], dim=0) / eps, dim=0)
 
         # Average iterate
-        update = hatg + eps * torch.log(eta)
+        f = evaluate_potential_finite(hatg, slice(None), distance, eps)
+        update = f + eps * torch.log(eta)
         ahatg = eps * torch.logsumexp(torch.cat([ahatg[None, :], update[None, :]], dim=0) / eps, dim=0)
 
         # Update g
