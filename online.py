@@ -236,28 +236,28 @@ def sampling_sinkhorn(x_sampler, y_sampler, eps, m, grid, n_iter=100, step_size=
     w = 0
     fevals = []
     gevals = []
+    C = compute_distance(grid, grid)
     for i in range(0, n_iter):
         if step_size == 'sqrt':
             eta = torch.tensor(i + 1.).pow(torch.tensor(-0.51))
         elif step_size == 'linear':
             eta = torch.tensor(1. / (i + 1))
         elif step_size == 'constant':
-            eta = torch.tensor(.1)
+            eta = torch.tensor(1.)
 
         # Update f
         y_, logb = y_sampler(m)
-        x_, loga = x_sampler(m)
         if i > 0:
-            f = evaluate_potential(hatg[:i * m], posy[:i * m], x_, eps)
             g = evaluate_potential(hatf[:i * m], posx[:i * m], y_, eps)
         else:
             g = torch.zeros(m)
-            f = torch.zeros(m)
         hatg[:i * m] += eps * torch.log(1 - eta)
         hatg[i * m:(i + 1) * m] = eps * math.log(eta) + logb * eps + g
         posy[i * m:(i + 1) * m] = y_
         # hatg[:(i + 1) * m] -= eps * torch.logsumexp(hatg[:(i + 1) * m] / eps, dim=0)
 
+        x_, loga = x_sampler(m)
+        f = evaluate_potential(hatg[:(i + 1) * m], posy[:(i + 1) * m], x_, eps)
         # Update g
         hatf[:i * m] += eps * torch.log(1 - eta)
         hatf[i * m:(i + 1) * m] = eps * math.log(eta) + loga * eps + f
@@ -266,14 +266,19 @@ def sampling_sinkhorn(x_sampler, y_sampler, eps, m, grid, n_iter=100, step_size=
         w *= 1 - eta
         w += eta * (hatf[i * m:(i + 1) * m].mean() + hatg[i * m:(i + 1) * m].mean())
 
-        if i % 10 == 0:
-            fevals.append(evaluate_potential(hatg[:(i + 1) * m], posy[:(i + 1) * m], grid, eps))
-            gevals.append(evaluate_potential(hatf[:(i + 1) * m], posx[:(i + 1) * m], grid, eps))
+        if i % 100 == 0:
+            feval = evaluate_potential(hatg[:(i + 1) * m], posy[:(i + 1) * m], grid, eps)
+            geval = evaluate_potential(hatf[:(i + 1) * m], posx[:(i + 1) * m], grid, eps)
+            plan = (x_sampler.log_prob(grid)[:, None] + feval[:, None] / eps + y_sampler.log_prob(grid)[None, :]
+                    + geval[None, :] / eps - C / eps)
+            print(torch.logsumexp(plan.view(-1), dim=0))
+            fevals.append(feval)
+            gevals.append(geval)
     return hatf, posx, hatg, posy, w, fevals, gevals
 
 
 def one_dimensional_exp():
-    eps = 1e-2
+    eps = 1e-1
 
     grid = torch.linspace(-1, 7, 500)[:, None]
     C = compute_distance(grid, grid)
@@ -283,8 +288,8 @@ def one_dimensional_exp():
     y_sampler = Sampler(mean=torch.tensor([[0.], [3], [5]]), cov=torch.tensor([[[.1]], [[.1]], [[.4]]]),
                         p=torch.ones(3) / 3)
     #
-    x_sampler = Sampler(mean=torch.tensor([[0.]]), cov=torch.tensor([[[.1]]]), p=torch.ones(1))
-    y_sampler = Sampler(mean=torch.tensor([[2.]]), cov=torch.tensor([[[.1]]]), p=torch.ones(1))
+    # x_sampler = Sampler(mean=torch.tensor([[0.]]), cov=torch.tensor([[[.1]]]), p=torch.ones(1))
+    # y_sampler = Sampler(mean=torch.tensor([[2.]]), cov=torch.tensor([[[.1]]]), p=torch.ones(1))
 
     px = torch.exp(x_sampler.log_prob(grid))
     py = torch.exp(y_sampler.log_prob(grid))
@@ -294,12 +299,12 @@ def one_dimensional_exp():
     labels = []
     plans = []
 
-    n_samples = 2000
+    n_samples = 1000
     x, loga = x_sampler(n_samples)
     y, logb = y_sampler(n_samples)
     # x_sampler.pos_, x_sampler.logweight_ = x, loga
     # y_sampler.pos_, y_sampler.logweight_ = y, logb
-    f, g = sinkhorn(x, y, eps=eps, n_iter=10)
+    f, g = sinkhorn(x, y, eps=eps, n_iter=100)
     distance = compute_distance(grid, y)
     feval = - eps * torch.logsumexp((- distance + g[None, :]) / eps + logb[None, :], dim=1)
     distance = compute_distance(grid, x)
@@ -318,8 +323,8 @@ def one_dimensional_exp():
     gevals.append(geval)
     labels.append(f'Sinkhorn n={n_samples}')
     hatf, posx, hatg, posy, w, sto_fevals, sto_gevals = sampling_sinkhorn(x_sampler, y_sampler, m=100, eps=eps,
-                                                                          n_iter=100,
-                                                                          step_size='sqrt', grid=grid)
+                                                                          n_iter=1000,
+                                                                          step_size='linear', grid=grid)
     feval = evaluate_potential(hatg, posy, grid, eps)
     geval = evaluate_potential(hatf, posx, grid, eps)
     plan = (x_sampler.log_prob(grid)[:, None] + feval[:, None] / eps + y_sampler.log_prob(grid)[None, :]
