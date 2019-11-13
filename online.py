@@ -117,7 +117,8 @@ def stochasic_sinkhorn_finite(x, y, fref, gref, wref, eps, m, n_iter=100, step_s
             fref2 = evaluate_potential_finite(gref + logb * eps, slice(None), distance, eps)
             gref2 = evaluate_potential_finite(fref + loga * eps, slice(None), distance.transpose(0, 1), eps)
             plan = torch.exp((loga[:, None] * eps + ff[:, None] + logb[:, None] * eps + gg[None, :] - distance) / eps)
-            planref = torch.exp((loga[:, None] * eps + fref[:, None] + logb[:, None] * eps + gref[None, :] - distance) / eps)
+            planref = torch.exp(
+                (loga[:, None] * eps + fref[:, None] + logb[:, None] * eps + gref[None, :] - distance) / eps)
             # print(plan, planref)
             errors = {'f - T(g, b)': var_norm(ff - ff2),
                       'g - T(f, a)': var_norm(gg - gg2),
@@ -141,7 +142,7 @@ def var_norm(x):
     return x.max() - x.min()
 
 
-def sinkhorn(x, y, eps, n_iter=100):
+def sinkhorn(x, y, eps, n_iter=1000):
     n = x.shape[0]
     loga = torch.full((n,), fill_value=-math.log(n))
     logb = torch.full((n,), fill_value=-math.log(n))
@@ -151,13 +152,11 @@ def sinkhorn(x, y, eps, n_iter=100):
     for i in range(n_iter):
         ff = - eps * torch.logsumexp((- distance + g[None, :]) / eps + logb[None, :], dim=1)
         f_diff = f - ff
-        f = ff
-        gg = - eps * torch.logsumexp((- distance.transpose(0, 1) + f[None, :]) / eps + loga[None, :], dim=1)
+
+        gg = - eps * torch.logsumexp((- distance.transpose(0, 1) + ff[None, :]) / eps + loga[None, :], dim=1)
         g_diff = g - gg
         tol = f_diff.max() - f_diff.min() + g_diff.max() - g_diff.min()
-        g = gg
-        plan = torch.exp((loga[:, None] * eps + f[:, None] + logb[:, None] * eps + g[None, :] - distance) / eps)
-        # print(plan.sum(dim=1))
+        f, g = ff, gg
     print('tol', tol)
     return f, g
 
@@ -185,7 +184,8 @@ def main():
     print('===========================================Finite stochastic=====================================')
     torch.manual_seed(100)
     np.random.seed(100)
-    smd_f, smd_g = stochasic_sinkhorn_finite(x, y, fref=f, gref=g, eps=eps, wref=w, m=m, n_iter=100000, step_size='sqrt')
+    smd_f, smd_g = stochasic_sinkhorn_finite(x, y, fref=f, gref=g, eps=eps, wref=w, m=m, n_iter=100000,
+                                             step_size='sqrt')
     print(smd_f.mean() + smd_g.mean())
 
 
@@ -201,7 +201,7 @@ class Sampler():
         self.norm = torch.sqrt((2 * math.pi) ** d * det)
         self.p = p
 
-    def __call__(self, n):
+    def _call(self, n):
         k, d = self.mean.shape
         indices = np.random.choice(k, n, p=self.p.numpy())
         pos = np.zeros((n, d), dtype=np.float32)
@@ -212,6 +212,14 @@ class Sampler():
         logweight = np.full_like(pos[:, 0], fill_value=-math.log(n))
         return torch.from_numpy(pos), torch.from_numpy(logweight)
 
+    def __call__(self, n, fake=False):
+        if fake:
+            if not hasattr(self, 'pos_'):
+                self.pos_, self.logweight_ = self._call(n)
+            return self.pos_, self.logweight_
+        else:
+            return self._call(n)
+
     def log_prob(self, x):
         # b, d = x.shape
         diff = x[:, None, :] - self.mean[None, :]  # b, k, d
@@ -220,58 +228,61 @@ class Sampler():
 
 
 def sampling_sinkhorn(x_sampler, y_sampler, eps, m, grid, n_iter=100, step_size='sqrt'):
-    hatf = torch.zeros(m * n_iter)
-    posx = torch.zeros(m * n_iter, 2)
-    hatg = torch.zeros(m * n_iter)
-    posy = torch.zeros(m * n_iter, 2)
+    posx = torch.zeros(m * n_iter, 1)
+    hatg = torch.full((m * n_iter,), fill_value=-float('inf'))
+    hatf = torch.full((m * n_iter,), fill_value=-float('inf'))
+
+    posy = torch.zeros(m * n_iter, 1)
     w = 0
     fevals = []
     gevals = []
     for i in range(0, n_iter):
         if step_size == 'sqrt':
-            eta = torch.tensor(1. / math.sqrt(i + 1))
+            eta = torch.tensor(i + 1.).pow(torch.tensor(-0.51))
         elif step_size == 'linear':
             eta = torch.tensor(1. / (i + 1))
         elif step_size == 'constant':
-            eta = torch.tensor(1.)
+            eta = torch.tensor(.1)
 
         # Update f
         y_, logb = y_sampler(m)
         x_, loga = x_sampler(m)
         if i > 0:
-            g = evaluate_potential(hatf[:i * m], posx[:i * m], y_, eps)
             f = evaluate_potential(hatg[:i * m], posy[:i * m], x_, eps)
+            g = evaluate_potential(hatf[:i * m], posx[:i * m], y_, eps)
         else:
             g = torch.zeros(m)
             f = torch.zeros(m)
         hatg[:i * m] += eps * torch.log(1 - eta)
         hatg[i * m:(i + 1) * m] = eps * math.log(eta) + logb * eps + g
         posy[i * m:(i + 1) * m] = y_
+        # hatg[:(i + 1) * m] -= eps * torch.logsumexp(hatg[:(i + 1) * m] / eps, dim=0)
 
         # Update g
         hatf[:i * m] += eps * torch.log(1 - eta)
         hatf[i * m:(i + 1) * m] = eps * math.log(eta) + loga * eps + f
         posx[i * m:(i + 1) * m] = x_
+        # hatf[:(i + 1) * m] -= eps * torch.logsumexp(hatf[:(i + 1) * m] / eps, dim=0)
         w *= 1 - eta
         w += eta * (hatf[i * m:(i + 1) * m].mean() + hatg[i * m:(i + 1) * m].mean())
 
         if i % 10 == 0:
-            fevals.append(evaluate_potential(hatg, posy, grid, eps))
-            gevals.append(evaluate_potential(hatf, posx, grid, eps))
-
+            fevals.append(evaluate_potential(hatg[:(i + 1) * m], posy[:(i + 1) * m], grid, eps))
+            gevals.append(evaluate_potential(hatf[:(i + 1) * m], posx[:(i + 1) * m], grid, eps))
     return hatf, posx, hatg, posy, w, fevals, gevals
 
 
 def one_dimensional_exp():
-    eps = 1e-1
+    eps = 1e-2
 
-    grid = torch.linspace(-1, 7, 100)[:, None]
+    grid = torch.linspace(-1, 7, 500)[:, None]
+    C = compute_distance(grid, grid)
 
     x_sampler = Sampler(mean=torch.tensor([[1.], [2], [3]]), cov=torch.tensor([[[.1]], [[.1]], [[.1]]]),
                         p=torch.ones(3) / 3)
     y_sampler = Sampler(mean=torch.tensor([[0.], [3], [5]]), cov=torch.tensor([[[.1]], [[.1]], [[.4]]]),
                         p=torch.ones(3) / 3)
-
+    #
     x_sampler = Sampler(mean=torch.tensor([[0.]]), cov=torch.tensor([[[.1]]]), p=torch.ones(1))
     y_sampler = Sampler(mean=torch.tensor([[2.]]), cov=torch.tensor([[[.1]]]), p=torch.ones(1))
 
@@ -281,35 +292,58 @@ def one_dimensional_exp():
     fevals = []
     gevals = []
     labels = []
-    ws = []
-    for n_samples in [1, 10, 100, 1000]:
-        x, loga = x_sampler(n_samples)
-        y, logb = y_sampler(n_samples)
-        f, g = sinkhorn(x, y, eps=eps, n_iter=100)
-        ws.append(torch.mean(f) + torch.mean(g))
-        distance = compute_distance(grid, y)
-        feval = - eps * torch.logsumexp((- distance + g[None, :]) / eps + logb[None, :], dim=1)
-        distance = compute_distance(grid, x)
-        geval = - eps * torch.logsumexp((- distance + f[None, :]) / eps + loga[None, :], dim=1)
-        fevals.append(feval)
-        gevals.append(geval)
-        labels.append(f'Sinkhorn n={n_samples}')
-    hatf, posx, hatg, posy, w, sto_fevals, sto_gevals = sampling_sinkhorn(x_sampler, y_sampler, m=n_samples, eps=eps, n_iter=10,
-                                                         step_size='constant', grid=grid)
-    ws.append(w)
+    plans = []
+
+    n_samples = 2000
+    x, loga = x_sampler(n_samples)
+    y, logb = y_sampler(n_samples)
+    # x_sampler.pos_, x_sampler.logweight_ = x, loga
+    # y_sampler.pos_, y_sampler.logweight_ = y, logb
+    f, g = sinkhorn(x, y, eps=eps, n_iter=10)
+    distance = compute_distance(grid, y)
+    feval = - eps * torch.logsumexp((- distance + g[None, :]) / eps + logb[None, :], dim=1)
+    distance = compute_distance(grid, x)
+    geval = - eps * torch.logsumexp((- distance + f[None, :]) / eps + loga[None, :], dim=1)
+    distance = compute_distance(x, y)
+    plan = loga[:, None] + f[:, None] / eps + logb[None, :] + g[None, :] / eps - distance / eps
+    print(torch.logsumexp(plan.view(-1), dim=0))
+
+    plan = (x_sampler.log_prob(grid)[:, None] + feval[:, None] / eps + y_sampler.log_prob(grid)[None, :]
+            + geval[None, :] / eps - C / eps)
+    print(torch.logsumexp(plan.view(-1), dim=0))
+
+    plans.append((plan, grid, grid))
+
+    fevals.append(feval)
+    gevals.append(geval)
+    labels.append(f'Sinkhorn n={n_samples}')
+    hatf, posx, hatg, posy, w, sto_fevals, sto_gevals = sampling_sinkhorn(x_sampler, y_sampler, m=100, eps=eps,
+                                                                          n_iter=100,
+                                                                          step_size='sqrt', grid=grid)
     feval = evaluate_potential(hatg, posy, grid, eps)
     geval = evaluate_potential(hatf, posx, grid, eps)
-    labels.append(f'Online Sinkhorn n={n_samples}')
+    plan = (x_sampler.log_prob(grid)[:, None] + feval[:, None] / eps + y_sampler.log_prob(grid)[None, :]
+            + geval[None, :] / eps - C / eps)
+    plans.append((plan, grid, grid))
+    print(torch.logsumexp(plan.view(-1), dim=0))
+
+    fevals.append(feval)
+    gevals.append(geval)
+    labels.append(f'Online Sinkhorn n={10}')
     fevals = torch.cat([feval[None, :] for feval in fevals], dim=0)
     gevals = torch.cat([geval[None, :] for geval in gevals], dim=0)
 
     fig, axes = plt.subplots(4, 1, figsize=(8, 12))
+    fig_plan, axes_plan = plt.subplots(1, 2, figsize=(8, 4))
     axes[0].plot(grid, px, label='alpha')
     axes[0].plot(grid, py, label='beta')
     axes[0].legend()
-    for label, feval, geval in zip(labels, fevals, gevals):
+    for i, (label, feval, geval, (plan, x, y)) in enumerate(zip(labels, fevals, gevals, plans)):
         axes[1].plot(grid, feval, label=label)
         axes[2].plot(grid, geval, label=label)
+        plan = plan.numpy()
+        axes_plan[i].contourf(y[:, 0], x[:, 0], plan, levels=30)
+    # axes_plan[1].add_colorbar()
     colors = plt.cm.get_cmap('Blues')(np.linspace(0.2, 1, len(sto_fevals)))
     axes[3].set_prop_cycle('color', colors)
     for eval in sto_fevals:
