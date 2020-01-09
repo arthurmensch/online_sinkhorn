@@ -1,0 +1,6 @@
+db:
+  class: tutorial.MySQLConnection
+  params:
+    host: localhost
+    user: root
+    password: 1234

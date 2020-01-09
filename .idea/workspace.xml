@@ -2,13 +2,19 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="adf0c6cb-11cd-42ce-863c-8da01b12a349" name="Default Changelist" comment="">
-      <change afterPath="$PROJECT_DIR$/infinite.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/deployment.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/deployment.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/online_sinkhorn.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/online_sinkhorn.iml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/coding.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/conf/config.yaml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/conf/db/mysql.yaml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/conf/db/postgresql.yaml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/exp.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/gw.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/optimize.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/saddles.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/toy.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/tutorial/__init__.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/online.py" beforeDir="false" afterPath="$PROJECT_DIR$/online.py" afterDir="false" />
     </list>
-    <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -25,11 +31,16 @@
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
   <component name="HighlightingSettingsPerFile">
-    <setting file="file://$PROJECT_DIR$/online.py" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/hausdorff.py" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/online.py" root0="FORCE_HIGHLIGHTING" />
   </component>
   <component name="ProjectId" id="1SBWqxMIS8QvW177WHfpR7yOJWt" />
   <component name="ProjectLevelVcsManager" settingsEditedManually="true" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showExcludedFiles" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
   <component name="PropertiesComponent">
     <property name="SHARE_PROJECT_CONFIGURATION_FILES" value="true" />
     <property name="WebServerToolWindowFactoryState" value="true" />
@@ -38,25 +49,19 @@
     <property name="WebServerToolWindowPanel.toolwindow.show.date" value="false" />
     <property name="WebServerToolWindowPanel.toolwindow.show.permissions" value="false" />
     <property name="WebServerToolWindowPanel.toolwindow.show.size" value="false" />
-    <property name="last_opened_file_path" value="$PROJECT_DIR$/../../colab/timothee/hierl" />
+    <property name="last_opened_file_path" value="$PROJECT_DIR$/conf/db" />
     <property name="nodejs_interpreter_path.stuck_in_default_project" value="undefined stuck path" />
     <property name="nodejs_npm_path_reset_for_default_project" value="true" />
     <property name="settings.editor.selected.configurable" value="com.jetbrains.python.configuration.PyIntegratedToolsModulesConfigurable" />
   </component>
-  <component name="RunDashboard">
-    <option name="ruleStates">
-      <list>
-        <RuleState>
-          <option name="name" value="ConfigurationTypeDashboardGroupingRule" />
-        </RuleState>
-        <RuleState>
-          <option name="name" value="StatusDashboardGroupingRule" />
-        </RuleState>
-      </list>
-    </option>
+  <component name="RecentsManager">
+    <key name="CopyFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$/conf/db" />
+      <recent name="$PROJECT_DIR$" />
+    </key>
   </component>
-  <component name="RunManager" selected="Python.online">
-    <configuration name="infinite" type="PythonConfigurationType" factoryName="Python" temporary="true">
+  <component name="RunManager" selected="Python.exp">
+    <configuration name="coding" type="PythonConfigurationType" factoryName="Python" temporary="true">
       <module name="online_sinkhorn" />
       <option name="INTERPRETER_OPTIONS" value="" />
       <option name="PARENT_ENVS" value="true" />
@@ -69,7 +74,7 @@
       <option name="ADD_CONTENT_ROOTS" value="true" />
       <option name="ADD_SOURCE_ROOTS" value="true" />
       <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
-      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/infinite.py" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/coding.py" />
       <option name="PARAMETERS" value="" />
       <option name="SHOW_COMMAND_LINE" value="false" />
       <option name="EMULATE_TERMINAL" value="false" />
@@ -78,7 +83,7 @@
       <option name="INPUT_FILE" value="" />
       <method v="2" />
     </configuration>
-    <configuration name="jax" type="PythonConfigurationType" factoryName="Python" temporary="true">
+    <configuration name="exp" type="PythonConfigurationType" factoryName="Python" temporary="true">
       <module name="online_sinkhorn" />
       <option name="INTERPRETER_OPTIONS" value="" />
       <option name="PARENT_ENVS" value="true" />
@@ -91,7 +96,7 @@
       <option name="ADD_CONTENT_ROOTS" value="true" />
       <option name="ADD_SOURCE_ROOTS" value="true" />
       <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
-      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/test_jax.py" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/exp.py" />
       <option name="PARAMETERS" value="" />
       <option name="SHOW_COMMAND_LINE" value="false" />
       <option name="EMULATE_TERMINAL" value="false" />
@@ -100,7 +105,7 @@
       <option name="INPUT_FILE" value="" />
       <method v="2" />
     </configuration>
-    <configuration name="online" type="PythonConfigurationType" factoryName="Python" temporary="true">
+    <configuration name="gw" type="PythonConfigurationType" factoryName="Python" temporary="true">
       <module name="online_sinkhorn" />
       <option name="INTERPRETER_OPTIONS" value="" />
       <option name="PARENT_ENVS" value="true" />
@@ -113,7 +118,7 @@
       <option name="ADD_CONTENT_ROOTS" value="true" />
       <option name="ADD_SOURCE_ROOTS" value="true" />
       <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
-      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/online.py" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/gw.py" />
       <option name="PARAMETERS" value="" />
       <option name="SHOW_COMMAND_LINE" value="false" />
       <option name="EMULATE_TERMINAL" value="false" />
@@ -122,13 +127,78 @@
       <option name="INPUT_FILE" value="" />
       <method v="2" />
     </configuration>
+    <configuration name="optimize" type="PythonConfigurationType" factoryName="Python" temporary="true">
+      <module name="online_sinkhorn" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/optimize.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
+    <configuration name="saddles" type="PythonConfigurationType" factoryName="Python" temporary="true">
+      <module name="online_sinkhorn" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/saddles.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
+    <list>
+      <item itemvalue="Python.coding" />
+      <item itemvalue="Python.exp" />
+      <item itemvalue="Python.gw" />
+      <item itemvalue="Python.optimize" />
+      <item itemvalue="Python.saddles" />
+    </list>
     <recent_temporary>
       <list>
-        <item itemvalue="Python.online" />
-        <item itemvalue="Python.infinite" />
-        <item itemvalue="Python.jax" />
+        <item itemvalue="Python.exp" />
+        <item itemvalue="Python.saddles" />
+        <item itemvalue="Python.coding" />
+        <item itemvalue="Python.gw" />
+        <item itemvalue="Python.optimize" />
       </list>
     </recent_temporary>
+  </component>
+  <component name="ServiceViewManager">
+    <option name="viewStates">
+      <list>
+        <serviceView>
+          <treeState>
+            <expand />
+            <select />
+          </treeState>
+        </serviceView>
+      </list>
+    </option>
   </component>
   <component name="Vcs.Log.History.Properties">
     <option name="COLUMN_ORDER">
@@ -156,7 +226,59 @@
   <component name="VcsManagerConfiguration">
     <MESSAGE value="Not converging" />
     <MESSAGE value="WIP" />
-    <option name="LAST_COMMIT_MESSAGE" value="WIP" />
+    <MESSAGE value="WIP figures" />
+    <MESSAGE value="Alternated" />
+    <option name="LAST_COMMIT_MESSAGE" value="Alternated" />
+  </component>
+  <component name="WindowStateProjectService">
+    <state x="737" y="390" key="#com.intellij.execution.impl.EditConfigurationsDialog" timestamp="1576761495745">
+      <screen x="0" y="27" width="2560" height="1413" />
+    </state>
+    <state x="737" y="390" key="#com.intellij.execution.impl.EditConfigurationsDialog/0.27.2560.1413@0.27.2560.1413" timestamp="1576761495745" />
+    <state width="2512" height="484" key="GridCell.Tab.0.bottom" timestamp="1576778857521">
+      <screen x="0" y="27" width="1920" height="1053" />
+    </state>
+    <state width="2512" height="484" key="GridCell.Tab.0.bottom/0.27.1920.1053@0.27.1920.1053" timestamp="1576778857521" />
+    <state width="2512" height="216" key="GridCell.Tab.0.bottom/0.27.2560.1413@0.27.2560.1413" timestamp="1576762123673" />
+    <state width="2512" height="484" key="GridCell.Tab.0.center" timestamp="1576778857520">
+      <screen x="0" y="27" width="1920" height="1053" />
+    </state>
+    <state width="2512" height="484" key="GridCell.Tab.0.center/0.27.1920.1053@0.27.1920.1053" timestamp="1576778857520" />
+    <state width="2512" height="216" key="GridCell.Tab.0.center/0.27.2560.1413@0.27.2560.1413" timestamp="1576762123673" />
+    <state width="2512" height="484" key="GridCell.Tab.0.left" timestamp="1576778857520">
+      <screen x="0" y="27" width="1920" height="1053" />
+    </state>
+    <state width="2512" height="484" key="GridCell.Tab.0.left/0.27.1920.1053@0.27.1920.1053" timestamp="1576778857520" />
+    <state width="2512" height="216" key="GridCell.Tab.0.left/0.27.2560.1413@0.27.2560.1413" timestamp="1576762123673" />
+    <state width="2512" height="484" key="GridCell.Tab.0.right" timestamp="1576778857521">
+      <screen x="0" y="27" width="1920" height="1053" />
+    </state>
+    <state width="2512" height="484" key="GridCell.Tab.0.right/0.27.1920.1053@0.27.1920.1053" timestamp="1576778857521" />
+    <state width="2512" height="216" key="GridCell.Tab.0.right/0.27.2560.1413@0.27.2560.1413" timestamp="1576762123673" />
+    <state width="2512" height="484" key="GridCell.Tab.1.bottom" timestamp="1576778857522">
+      <screen x="0" y="27" width="1920" height="1053" />
+    </state>
+    <state width="2512" height="484" key="GridCell.Tab.1.bottom/0.27.1920.1053@0.27.1920.1053" timestamp="1576778857522" />
+    <state width="2512" height="484" key="GridCell.Tab.1.bottom/0.27.2560.1413@0.27.2560.1413" timestamp="1576761299297" />
+    <state width="2512" height="484" key="GridCell.Tab.1.center" timestamp="1576778857521">
+      <screen x="0" y="27" width="1920" height="1053" />
+    </state>
+    <state width="2512" height="484" key="GridCell.Tab.1.center/0.27.1920.1053@0.27.1920.1053" timestamp="1576778857521" />
+    <state width="2512" height="484" key="GridCell.Tab.1.center/0.27.2560.1413@0.27.2560.1413" timestamp="1576761299297" />
+    <state width="2512" height="484" key="GridCell.Tab.1.left" timestamp="1576778857521">
+      <screen x="0" y="27" width="1920" height="1053" />
+    </state>
+    <state width="2512" height="484" key="GridCell.Tab.1.left/0.27.1920.1053@0.27.1920.1053" timestamp="1576778857521" />
+    <state width="2512" height="484" key="GridCell.Tab.1.left/0.27.2560.1413@0.27.2560.1413" timestamp="1576761299296" />
+    <state width="2512" height="484" key="GridCell.Tab.1.right" timestamp="1576778857522">
+      <screen x="0" y="27" width="1920" height="1053" />
+    </state>
+    <state width="2512" height="484" key="GridCell.Tab.1.right/0.27.1920.1053@0.27.1920.1053" timestamp="1576778857522" />
+    <state width="2512" height="484" key="GridCell.Tab.1.right/0.27.2560.1413@0.27.2560.1413" timestamp="1576761299297" />
+    <state x="623" y="253" width="672" height="678" key="search.everywhere.popup" timestamp="1575652721260">
+      <screen x="0" y="27" width="1920" height="1053" />
+    </state>
+    <state x="623" y="253" width="672" height="678" key="search.everywhere.popup/0.27.1920.1053@0.27.1920.1053" timestamp="1575652721260" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
@@ -181,6 +303,31 @@
           <line>52</line>
           <option name="timeStamp" value="11" />
         </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/coding.py</url>
+          <line>144</line>
+          <option name="timeStamp" value="12" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/coding.py</url>
+          <line>153</line>
+          <option name="timeStamp" value="13" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file:///opt/anaconda3/lib/python3.7/queue.py</url>
+          <line>232</line>
+          <option name="timeStamp" value="14" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/saddles.py</url>
+          <line>44</line>
+          <option name="timeStamp" value="15" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/saddles.py</url>
+          <line>22</line>
+          <option name="timeStamp" value="16" />
+        </line-breakpoint>
       </breakpoints>
     </breakpoint-manager>
     <watches-manager>
@@ -191,10 +338,15 @@
     </watches-manager>
   </component>
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
-    <SUITE FILE_PATH="coverage/online_sinkhorn$online.coverage" NAME="online Coverage Results" MODIFIED="1573664495418" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
-    <SUITE FILE_PATH="coverage/online_sinkhorn$infinite.coverage" NAME="infinite Coverage Results" MODIFIED="1573660812061" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/online_sinkhorn$unrolled.coverage" NAME="unrolled Coverage Results" MODIFIED="1571235341496" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/online_sinkhorn$optimize.coverage" NAME="optimize Coverage Results" MODIFIED="1574594560888" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/online_sinkhorn$infinite.coverage" NAME="infinite Coverage Results" MODIFIED="1573660812061" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/online_sinkhorn$jax.coverage" NAME="jax Coverage Results" MODIFIED="1571835663542" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/online_sinkhorn$hausdorff.coverage" NAME="hausdorff Coverage Results" MODIFIED="1571141002114" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/online_sinkhorn$coding.coverage" NAME="coding Coverage Results" MODIFIED="1574768065860" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/online_sinkhorn$saddles.coverage" NAME="saddles Coverage Results" MODIFIED="1575656324382" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/online_sinkhorn$exp.coverage" NAME="exp Coverage Results" MODIFIED="1576762123637" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/online_sinkhorn$online.coverage" NAME="online Coverage Results" MODIFIED="1573666684301" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/online_sinkhorn$gw.coverage" NAME="gw Coverage Results" MODIFIED="1574595020683" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
   </component>
 </project>

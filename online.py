@@ -247,40 +247,39 @@ def sampling_sinkhorn(x_sampler, y_sampler, eps, m, grid, n_iter=100, step_size=
 
         # Update f
         y_, logb = y_sampler(m)
+        x_, loga = x_sampler(m)
         if i > 0:
             g = evaluate_potential(hatf[:i * m], posx[:i * m], y_, eps)
+            f = evaluate_potential(hatg[:i * m], posy[:i * m], x_, eps)
         else:
             g = torch.zeros(m)
+            f = torch.zeros(m)
         hatg[:i * m] += eps * torch.log(1 - eta)
         hatg[i * m:(i + 1) * m] = eps * math.log(eta) + logb * eps + g
         posy[i * m:(i + 1) * m] = y_
-        # hatg[:(i + 1) * m] -= eps * torch.logsumexp(hatg[:(i + 1) * m] / eps, dim=0)
 
-        x_, loga = x_sampler(m)
-        f = evaluate_potential(hatg[:(i + 1) * m], posy[:(i + 1) * m], x_, eps)
         # Update g
         hatf[:i * m] += eps * torch.log(1 - eta)
         hatf[i * m:(i + 1) * m] = eps * math.log(eta) + loga * eps + f
         posx[i * m:(i + 1) * m] = x_
-        # hatf[:(i + 1) * m] -= eps * torch.logsumexp(hatf[:(i + 1) * m] / eps, dim=0)
         w *= 1 - eta
         w += eta * (hatf[i * m:(i + 1) * m].mean() + hatg[i * m:(i + 1) * m].mean())
 
-        if i % 100 == 0:
+        if i % 10 == 0:
             feval = evaluate_potential(hatg[:(i + 1) * m], posy[:(i + 1) * m], grid, eps)
             geval = evaluate_potential(hatf[:(i + 1) * m], posx[:(i + 1) * m], grid, eps)
-            plan = (x_sampler.log_prob(grid)[:, None] + feval[:, None] / eps + y_sampler.log_prob(grid)[None, :]
-                    + geval[None, :] / eps - C / eps)
-            print(torch.logsumexp(plan.view(-1), dim=0))
+            # plan = (x_sampler.log_prob(grid)[:, None] + feval[:, None] / eps + y_sampler.log_prob(grid)[None, :]
+            #         + geval[None, :] / eps - C / eps)
+            # print(torch.logsumexp(plan.view(-1), dim=0))
             fevals.append(feval)
             gevals.append(geval)
     return hatf, posx, hatg, posy, w, fevals, gevals
 
 
 def one_dimensional_exp():
-    eps = 1e-1
+    eps = 1e-3
 
-    grid = torch.linspace(-1, 7, 500)[:, None]
+    grid = torch.linspace(-4, 12, 500)[:, None]
     C = compute_distance(grid, grid)
 
     x_sampler = Sampler(mean=torch.tensor([[1.], [2], [3]]), cov=torch.tensor([[[.1]], [[.1]], [[.1]]]),
@@ -291,8 +290,12 @@ def one_dimensional_exp():
     # x_sampler = Sampler(mean=torch.tensor([[0.]]), cov=torch.tensor([[[.1]]]), p=torch.ones(1))
     # y_sampler = Sampler(mean=torch.tensor([[2.]]), cov=torch.tensor([[[.1]]]), p=torch.ones(1))
 
-    px = torch.exp(x_sampler.log_prob(grid))
-    py = torch.exp(y_sampler.log_prob(grid))
+    lpx = x_sampler.log_prob(grid)
+    lpy = y_sampler.log_prob(grid)
+    lpx -= torch.logsumexp(lpx, dim=0)
+    lpy -= torch.logsumexp(lpy, dim=0)
+    px = torch.exp(lpx)
+    py = torch.exp(lpy)
 
     fevals = []
     gevals = []
@@ -313,7 +316,7 @@ def one_dimensional_exp():
     plan = loga[:, None] + f[:, None] / eps + logb[None, :] + g[None, :] / eps - distance / eps
     print(torch.logsumexp(plan.view(-1), dim=0))
 
-    plan = (x_sampler.log_prob(grid)[:, None] + feval[:, None] / eps + y_sampler.log_prob(grid)[None, :]
+    plan = (lpx[:, None] + feval[:, None] / eps + lpy[None, :]
             + geval[None, :] / eps - C / eps)
     print(torch.logsumexp(plan.view(-1), dim=0))
 
@@ -322,12 +325,12 @@ def one_dimensional_exp():
     fevals.append(feval)
     gevals.append(geval)
     labels.append(f'Sinkhorn n={n_samples}')
-    hatf, posx, hatg, posy, w, sto_fevals, sto_gevals = sampling_sinkhorn(x_sampler, y_sampler, m=100, eps=eps,
+    hatf, posx, hatg, posy, w, sto_fevals, sto_gevals = sampling_sinkhorn(x_sampler, y_sampler, m=10, eps=eps,
                                                                           n_iter=1000,
-                                                                          step_size='linear', grid=grid)
+                                                                          step_size='sqrt', grid=grid)
     feval = evaluate_potential(hatg, posy, grid, eps)
     geval = evaluate_potential(hatf, posx, grid, eps)
-    plan = (x_sampler.log_prob(grid)[:, None] + feval[:, None] / eps + y_sampler.log_prob(grid)[None, :]
+    plan = (lpx[:, None] + feval[:, None] / eps + lpy[None, :]
             + geval[None, :] / eps - C / eps)
     plans.append((plan, grid, grid))
     print(torch.logsumexp(plan.view(-1), dim=0))
@@ -347,6 +350,7 @@ def one_dimensional_exp():
         axes[1].plot(grid, feval, label=label)
         axes[2].plot(grid, geval, label=label)
         plan = plan.numpy()
+        print(y, x, plan)
         axes_plan[i].contourf(y[:, 0], x[:, 0], plan, levels=30)
     # axes_plan[1].add_colorbar()
     colors = plt.cm.get_cmap('Blues')(np.linspace(0.2, 1, len(sto_fevals)))
