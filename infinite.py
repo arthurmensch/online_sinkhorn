@@ -114,9 +114,6 @@ def one_dimensional_exp():
                         p=torch.ones(3) / 3)
     y_sampler = Sampler(mean=torch.tensor([[0.], [3], [5]]), cov=torch.tensor([[[.1]], [[.1]], [[.4]]]),
                         p=torch.ones(3) / 3)
-    #
-    # x_sampler = Sampler(mean=torch.tensor([[0.]]), cov=torch.tensor([[[.1]]]), p=torch.ones(1))
-    # y_sampler = Sampler(mean=torch.tensor([[2.]]), cov=torch.tensor([[[.1]]]), p=torch.ones(1))
 
     px = torch.exp(x_sampler.log_prob(grid))
     py = torch.exp(y_sampler.log_prob(grid))
@@ -143,19 +140,11 @@ def one_dimensional_exp():
     F = Potential(1, n_samples, eps)
     G = Potential(1, n_samples, eps)
 
-    # G.pot.data = f.clone()
-    # G.logprob.data = loga.clone()
-    # G.pos.data = x.clone()
-    # F.pot.data = g.clone()
-    # F.logprob.data = logb.clone()
-    # F.pos.data = y.clone()
-    #
-    optimizer = Adam(list(F.parameters()) + list(G.parameters()), lr=1e-3)
+    optimizer = SGD(list(F.parameters()) + list(G.parameters()), lr=1e-3)
     for i in range(1000):
         x, loga = x_sampler(100)
         y, logb = y_sampler(100)
         obj = dual_objective(F, G, x, y, loga, logb, eps)
-        print(obj.item())
         optimizer.zero_grad()
         obj.backward()
         optimizer.step()
