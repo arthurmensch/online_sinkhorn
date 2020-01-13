@@ -80,62 +80,89 @@ def evaluate_potential_finite(log_pot: torch.tensor, idx: torch.tensor, distance
   return - eps * torch.logsumexp((- distance[idx] + log_pot[None, :]) / eps, dim=1)
 
 
-def stochasic_sinkhorn_finite(x, y, fref, gref, wref, eps, m, n_iter=100, step_size='constant'):
+def stochastic_sinkhorn_finite(x, y, fref, gref, wref, eps, m, n_iter=100, averaging='none'):
   n = x.shape[0]
-  hatf = torch.full((n,), fill_value=-float('inf'))
-  hatg = torch.full((n,), fill_value=-float('inf'))
+  p = torch.full((n,), fill_value=-float('inf'), dtype=x.dtype)
+  q = torch.full((n,), fill_value=-float('inf'), dtype=x.dtype)
+
+  if averaging == 'dual':
+    avg_p = torch.full((n,), fill_value=-float('inf'), dtype=x.dtype)
+    avg_q = torch.full((n,), fill_value=-float('inf'), dtype=x.dtype)
+  elif averaging == 'primal':
+    avg_ff = torch.full((n,), fill_value=-float('inf'), dtype=x.dtype)
+    avg_gg = torch.full((n,), fill_value=-float('inf'), dtype=x.dtype)
+
   distance = compute_distance(x, y)
+  trajs = []
+  sum_eta = 0
+  period_sum_eta = 0
   for i in range(0, n_iter):
-    # eta = torch.tensor(m / n)  # if i < 100 else torch.tensor(1. / (1. + math.pow(i + 1, 0.75)))
-    eta = torch.tensor(1. / math.pow(i + 1, 1))
-    # eta = torch.tensor(.9)
+    eta = torch.tensor(math.pow(i + 1, -.5))
+    sum_eta += eta
+    period_sum_eta += eta
     # Update f
     y_idx, logb = sample_from_finite(y, m)
-    x_idx, loga = sample_from_finite(x, m)
     if i > 0:
-      g = evaluate_potential_finite(hatf, y_idx, distance.transpose(0, 1), eps)
-      f = evaluate_potential_finite(hatg, x_idx, distance, eps)
+      g = evaluate_potential_finite(p, y_idx, distance.transpose(0, 1), eps)
     else:
-      g = gref[y_idx]
-      f = fref[x_idx]
-    hatg += eps * torch.log(1 - eta)
+      g = torch.zeros(m, dtype=x.dtype)
+    q += eps * torch.log(1 - eta)
     update = eps * math.log(eta) + logb * eps + g
-    hatg[y_idx] = eps * torch.logsumexp(torch.cat([hatg[y_idx][None, :], update[None, :]], dim=0) / eps, dim=0)
-    hatf += eps * torch.log(1 - eta)
+    q[y_idx] = eps * torch.logsumexp(torch.cat([q[y_idx][None, :], update[None, :]], dim=0) / eps, dim=0)
+    if averaging == 'dual':
+      avg_q = eps * torch.logsumexp(torch.cat([q[None, :] + math.log(eta) * eps, avg_q[None, :]]) / eps, dim=0)
+    # Update g
+    x_idx, loga = sample_from_finite(x, m)
+    f = evaluate_potential_finite(q, x_idx, distance, eps)
+
+    p += eps * torch.log(1 - eta)
     update = eps * math.log(eta) + loga * eps + f
-    hatf[x_idx] = eps * torch.logsumexp(torch.cat([hatf[x_idx][None, :], update[None, :]], dim=0) / eps, dim=0)
+    p[x_idx] = eps * torch.logsumexp(torch.cat([p[x_idx][None, :], update[None, :]], dim=0) / eps, dim=0)
+    if averaging == 'dual':
+      avg_p = eps * torch.logsumexp(torch.cat([p[None, :] + math.log(eta) * eps, avg_p[None, :]]) / eps, dim=0)
 
-    if i % 1000 == 0:
-      ff = evaluate_potential_finite(hatg, slice(None), distance, eps)
-      gg = evaluate_potential_finite(hatf, slice(None), distance.transpose(0, 1), eps)
-      w = ff.mean() + gg.mean()
+    if i % 100 == 0:
+      if averaging == 'primal':
+        this_ff = evaluate_potential_finite(q, slice(None), distance, eps)
+        this_gg = evaluate_potential_finite(p, slice(None), distance.transpose(0, 1), eps)
+        avg_ff = eps * torch.logsumexp(torch.cat([this_ff[None, :] + math.log(period_sum_eta) * eps, avg_ff[None, :]]) / eps, dim=0)
+        avg_gg = eps * torch.logsumexp(torch.cat([this_gg[None, :] + math.log(period_sum_eta) * eps, avg_gg[None, :]]) / eps, dim=0)
+        ff = avg_ff - eps * torch.log(sum_eta)
+        gg = avg_gg - eps * torch.log(sum_eta)
+        period_sum_eta = 0
+      elif averaging == 'dual':
+        ff = evaluate_potential_finite(avg_p - eps * torch.log(sum_eta), slice(None), distance, eps)
+        gg = evaluate_potential_finite(avg_q - eps * torch.log(sum_eta), slice(None), distance.transpose(0, 1), eps)
+      else:
+        ff = evaluate_potential_finite(q, slice(None), distance, eps)
+        gg = evaluate_potential_finite(p, slice(None), distance.transpose(0, 1), eps)
+      trajs.append([ff, gg])
 
-      loga = torch.full((n,), fill_value=-math.log(n))
-      logb = torch.full((n,), fill_value=-math.log(n))
+      loga = torch.full((n,), fill_value=-math.log(n), dtype=torch.float64)
+      logb = torch.full((n,), fill_value=-math.log(n), dtype=torch.float64)
       ff2 = evaluate_potential_finite(gg + logb * eps, slice(None), distance, eps)
       gg2 = evaluate_potential_finite(ff + loga * eps, slice(None), distance.transpose(0, 1), eps)
-      fref2 = evaluate_potential_finite(gref + logb * eps, slice(None), distance, eps)
-      gref2 = evaluate_potential_finite(fref + loga * eps, slice(None), distance.transpose(0, 1), eps)
+
+      w = ff.mean() + gg.mean()
+
       plan = torch.exp((loga[:, None] * eps + ff[:, None] + logb[:, None] * eps + gg[None, :] - distance) / eps)
       planref = torch.exp(
         (loga[:, None] * eps + fref[:, None] + logb[:, None] * eps + gref[None, :] - distance) / eps)
-      # print(plan, planref)
       errors = {'f - T(g, b)': var_norm(ff - ff2),
                 'g - T(f, a)': var_norm(gg - gg2),
+                'eta': eta,
                 'f - f_ref': var_norm(ff - fref),
                 'g - g_ref': var_norm(gg - gref),
                 'w - wref': (w - wref).item(),
                 'plan_diff': torch.max(torch.abs(plan - planref)),
                 'marg1': torch.max(torch.abs(plan.sum(1) - torch.ones(n) / n)),
                 'marg2': torch.max(torch.abs(plan.sum(0) - torch.ones(n) / n)),
-                # 'fref - T(gref, b)': var_norm(fref - fref2),
-                # 'gref - T(fref, a)': var_norm(gref - gref2),
                 }
       string = f"iter:{i} "
       for k, v in errors.items():
-        string += f'[{k}]:{v:.4f} '
+        string += f'[{k}]:{v:.3e} '
       print(string)
-  return ff, gg
+  return ff, gg, errors, trajs
 
 
 def var_norm(x):
@@ -144,11 +171,11 @@ def var_norm(x):
 
 def sinkhorn(x, y, eps, n_iter=1000):
   n = x.shape[0]
-  loga = torch.full((n,), fill_value=-math.log(n))
-  logb = torch.full((n,), fill_value=-math.log(n))
+  loga = torch.full((n,), fill_value=-math.log(n), dtype=torch.float64)
+  logb = torch.full((n,), fill_value=-math.log(n), dtype=torch.float64)
   distance = compute_distance(x, y)
-  g = torch.zeros((n,))
-  f = torch.zeros((n,))
+  g = torch.zeros((n,), dtype=torch.float64)
+  f = torch.zeros((n,), dtype=torch.float64)
   for i in range(n_iter):
     ff = - eps * torch.logsumexp((- distance + g[None, :]) / eps + logb[None, :], dim=1)
     f_diff = f - ff
@@ -162,32 +189,31 @@ def sinkhorn(x, y, eps, n_iter=1000):
 
 
 def main():
-  n = 100
-  m = 5
-  eps = 1
+  n = 2
+  m = 1
+  eps = 1e-2
 
   torch.manual_seed(100)
   np.random.seed(100)
 
-  y = torch.randn(n, 2) * 0.1
-  x = torch.randn((n, 2)) * 0.1 + 2
+  y = torch.randn((n, 10), dtype=torch.float64) * 0.1
+  x = torch.randn((n, 10), dtype=torch.float64) * 0.1 + 2
   print('===========================================True=====================================')
-  f, g = sinkhorn(x, y, eps=eps, n_iter=4000)
-  w = f.mean() + g.mean()
+  fref, gref = sinkhorn(x, y, eps=eps, n_iter=1000)
+  w = fref.mean() + gref.mean()
   print('w', w)
-  # print('===========================================Stochastic=====================================')
-  # torch.manual_seed(100)
-  # np.random.seed(100)
-  # smd_f, smd_g = stochasic_sinkhorn(x, y, eps=eps, m=m, n_iter=1000, step_size='sqrt')
-  # print(smd_f.mean() + smd_g.mean())
-  # print((f - smd_f).max() - (f - smd_f).min() + (g - smd_g).max() - (g - smd_g).min())
   print('===========================================Finite stochastic=====================================')
   torch.manual_seed(100)
   np.random.seed(100)
-  smd_f, smd_g = stochasic_sinkhorn_finite(x, y, fref=f, gref=g, eps=eps, wref=w, m=m, n_iter=100000,
-                                           step_size='sqrt')
-  print(smd_f.mean() + smd_g.mean())
-
+  smd_f, smd_g, errors, trajs = stochastic_sinkhorn_finite(x, y, fref=fref, gref=gref, eps=eps, wref=w, m=1, n_iter=50000,)
+  fs = torch.cat([traj[0][None, :] for traj in trajs])
+  gs = torch.cat([traj[1][None, :] for traj in trajs])
+  fs -= fref[None, :]
+  gs -= gref[None, :]
+  fig, ax = plt.subplots(1, 1)
+  print(fs)
+  ax.plot(fs[:, 0], fs[:, 1])
+  plt.show()
 
 class Sampler():
   def __init__(self, mean: torch.tensor, cov: torch.tensor, p: torch.tensor):
@@ -351,5 +377,5 @@ def one_dimensional_exp():
 
 
 if __name__ == '__main__':
-  # main()
-  one_dimensional_exp()
+  main()
+  # one_dimensional_exp()
