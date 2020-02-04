@@ -1,13 +1,22 @@
 import math
+import os
 from collections import defaultdict
 from os.path import expanduser
 
+import joblib
 import numpy as np
 import torch
 
 import matplotlib.pyplot as plt
-from joblib import Memory
+from joblib import Memory, delayed, Parallel
+import seaborn as sns
+import pandas as pd
 
+from matplotlib import rc
+import matplotlib
+matplotlib.rcParams['backend'] = 'pdf'
+rc('text', usetex=True)
+import matplotlib.pyplot as plt
 
 def sample_from(x, m):
     n = x.shape[0]
@@ -106,7 +115,7 @@ def stochastic_sinkhorn_finite(x, y, fref, gref, wref, eps, m, n_iter=100,
         if step_size == 'constant':
             eta = torch.tensor(eta)
         elif step_size == "1/2":
-            eta = torch.tensor(1 / (i+1))
+            eta = torch.tensor(1 / (i + 1))
         else:
             eta = torch.tensor(math.pow(i + 1, -.5))
         sum_eta += eta
@@ -183,11 +192,101 @@ def stochastic_sinkhorn_finite(x, y, fref, gref, wref, eps, m, n_iter=100,
     return ff, gg, errors, trajs
 
 
+def stochastic_sinkhorn_finite_simple(x, y, fref, gref, wref, eps, m, n_iter=100,
+                                      ieta=.5, eta=1.):
+    x = torch.from_numpy(x)
+    y = torch.from_numpy(y)
+    fref = torch.from_numpy(fref)
+    gref = torch.from_numpy(gref)
+    n = x.shape[0]
+    p = torch.full((n,), fill_value=-float('inf'), dtype=x.dtype)
+    q = torch.full((n,), fill_value=-float('inf'), dtype=x.dtype)
+
+    avg_p = torch.full((n,), fill_value=-float('inf'), dtype=x.dtype)
+    avg_q = torch.full((n,), fill_value=-float('inf'), dtype=x.dtype)
+
+    distance = compute_distance(x, y)
+    trajs = []
+    errors = defaultdict(list)
+    u_eta = not isinstance(eta, float)
+    u_ieta = not isinstance(ieta, float)
+    for i in range(0, n_iter):
+        # Update f
+        y_idx, logb = sample_from_finite(y, m)
+        x_idx, loga = sample_from_finite(x, m)
+
+        if i > 0:
+            g = evaluate_potential_finite(p, y_idx, distance.transpose(0, 1), eps)
+            f = evaluate_potential_finite(q, x_idx, distance, eps)
+        else:
+            g = torch.zeros(m, dtype=x.dtype)
+            f = torch.zeros(m, dtype=x.dtype)
+        if u_ieta:
+            if ieta == '1/t':
+                ieta_ = torch.tensor(1 / (i + 1))
+            elif ieta == '1/sqrt(t)':
+                ieta_ = torch.tensor(1 / math.sqrt(i + 1))
+            else:
+                raise ValueError
+        else:
+            ieta_ = torch.tensor(ieta)
+        if u_eta:
+            if eta == '1/t':
+                eta_ = torch.tensor(1 / (i + 1))
+            elif eta == '1/sqrt(t)':
+                eta_ = torch.tensor(1 / math.sqrt(i + 1))
+            else:
+                raise ValueError
+        else:
+            eta_ = torch.tensor(eta)
+        q += eps * torch.log(- ieta_ + 1)
+        update = eps * torch.log(ieta_) + logb * eps + g
+        q[y_idx] = eps * torch.logsumexp(torch.cat([q[y_idx][None, :], update[None, :]], dim=0) / eps, dim=0)
+
+        p += eps * torch.log(- ieta_ + 1)
+        update = eps * torch.log(ieta_) + loga * eps + f
+        p[x_idx] = eps * torch.logsumexp(torch.cat([p[x_idx][None, :], update[None, :]], dim=0) / eps, dim=0)
+
+        # eta_= torch.tensor(1.)
+        avg_q += eps * torch.log(- eta_ + 1)
+        update = eps * torch.log(eta_) + logb * eps + q[y_idx]
+        avg_q[y_idx] = eps * torch.logsumexp(torch.cat([update[None, :], avg_q[y_idx][None, :]]) / eps, dim=0)
+
+        avg_p += eps * torch.log(- eta_ + 1)
+        update = eps * torch.log(eta_) + loga * eps + p[x_idx]
+        avg_p[x_idx] = eps * torch.logsumexp(torch.cat([update[None, :], avg_p[x_idx][None, :]]) / eps, dim=0)
+
+        if i % 100 == 0:
+            ff = evaluate_potential_finite(avg_q, slice(None), distance, eps)
+            gg = evaluate_potential_finite(avg_p, slice(None), distance.transpose(0, 1), eps)
+            fff = evaluate_potential_finite(gg + math.log(1 / n) * eps, slice(None), distance, eps)
+            ggg = evaluate_potential_finite(ff + math.log(1 / n) * eps, slice(None), distance.transpose(0, 1), eps)
+            ff = (ff + fff) / 2
+            gg = (gg + ggg) / 2
+            w = ff.mean() + gg.mean()
+
+            errors['varnorm'].append(var_norm(ff - fref) + var_norm(gg - gref).item())
+            errors['rel varnorm'].append(
+                ((var_norm(ff - fref) + var_norm(gg - gref)) / (var_norm(fref) + var_norm(fref))).item())
+            errors['werr'].append(torch.abs(w - wref).item())
+            errors['rel werr'].append(torch.abs((w - wref) / wref).item())
+            errors['iter'].append(i)
+            string = f"iter:{i} "
+            for k, v in errors.items():
+                string += f'[{k}]:{v[-1]:.3e} '
+            print(string)
+    ff = evaluate_potential_finite(avg_p, slice(None), distance, eps)
+    gg = evaluate_potential_finite(avg_q, slice(None), distance.transpose(0, 1), eps)
+    return ff.numpy(), gg.numpy(), errors
+
+
 def var_norm(x):
     return x.max() - x.min()
 
 
 def sinkhorn(x, y, eps, n_iter=1000, l=1.):
+    x = torch.from_numpy(x)
+    y = torch.from_numpy(y)
     n = x.shape[0]
     loga = torch.full((n,), fill_value=-math.log(n), dtype=torch.float64)
     logb = torch.full((n,), fill_value=-math.log(n), dtype=torch.float64)
@@ -205,9 +304,7 @@ def sinkhorn(x, y, eps, n_iter=1000, l=1.):
         tol = f_diff.max() - f_diff.min() + g_diff.max() - g_diff.min()
         f, g = ff, gg
     print('tol', tol)
-    return f, g
-
-
+    return f.numpy(), g.numpy()
 
 
 class Sampler():
@@ -221,6 +318,7 @@ class Sampler():
         det = torch.tensor([torch.det(cov) for cov in self.cov])
         self.norm = torch.sqrt((2 * math.pi) ** d * det)
         self.p = p
+
     def _call(self, n):
         k, d = self.mean.shape
         indices = np.random.choice(k, n, p=self.p.numpy())
@@ -245,6 +343,8 @@ class Sampler():
         diff = x[:, None, :] - self.mean[None, :]  # b, k, d
         return torch.sum(self.p[None, :] * torch.exp(-torch.einsum('bkd,kde,bke->bk',
                                                                    [diff, self.icov, diff]) / 2) / self.norm, dim=1)
+
+
 def sampling_sinkhorn(x_sampler, y_sampler, eps, m, grid, n_iter=100, step_size='sqrt'):
     posx = torch.zeros(m * n_iter, 1)
     q = torch.full((m * n_iter,), fill_value=-float('inf'))
@@ -369,52 +469,75 @@ def one_dimensional_exp():
 
 
 def main():
-    n = 200
-    m = 20
-    eps = 1e-4
+    n = 2
+    m = 1
+    eps = 1
 
     torch.manual_seed(100)
     np.random.seed(100)
 
-    y = torch.randn((n, 10), dtype=torch.float64) * 0.1
-    x = torch.randn((n, 10), dtype=torch.float64) * 0.1 + 2
+    y = np.random.randn(n, 10)
+    x = np.random.randn(n, 10) + 2
 
     mem = Memory(location=expanduser('~/cache'))
     print('===========================================True=====================================')
-    fref, gref = mem.cache(sinkhorn)(x, y, eps=eps, n_iter=10000, l=1.)
+    fref, gref = mem.cache(sinkhorn)(x, y, eps=eps, n_iter=100, l=1.)
     wref = fref.mean() + gref.mean()
     print('wref', wref)
     print('===========================================Finite stochastic=====================================')
-    fig, axes = plt.subplots(1, 3, figsize=(9, 3))
-    for m, step_size, eta, avg in [
-        (20, 'constant', 1., 'none'),
-        (20, 'constant', 1., 'primal'),
-        # (20, 'constant', .1, 'none'),
-        # (20, 'constant', 0.01, 'none'),
-        # (200, 'constant', 1., 'none')
-    ]:
+    results = []
+
+    def single(eta, ieta, m):
         torch.manual_seed(100)
         np.random.seed(100)
-        smd_f, smd_g, errors, trajs = mem.cache(stochastic_sinkhorn_finite)(x, y, fref=fref,
-                                                                            gref=gref,
-                                                                            eps=eps, wref=wref, m=m, n_iter=int(1e4),
-                                                                            averaging=avg,
-                                                                            step_size=step_size, eta=eta,
-                                                                            scheme='alternated')
-        fs = torch.cat([traj[0][None, :] for traj in trajs])
-        gs = torch.cat([traj[1][None, :] for traj in trajs])
-        w = np.array([traj[2] for traj in trajs])
-        w -= wref.item()
+        smd_f, smd_g, errors = mem.cache(stochastic_sinkhorn_finite_simple)(x, y, fref=fref,
+                                                                            gref=gref, ieta=ieta,
+                                                                            eta=eta,
+                                                                            eps=eps, wref=wref, m=m,
+                                                                            n_iter=int(1e6), )
+        return dict(m=m, ieta=ieta, eta=eta, name='', errors=errors)
+    results = Parallel(n_jobs=18)(delayed(single)(eta, ieta, m)
+                                 for m in [1, 2]
+                                 for eta in [1., '1/sqrt(t)', '1/t']
+                                 for ieta in [1., '1/sqrt(t)', '1/t'])
+    if not os.path.exists(expanduser('~/output/online_sinkhorn')):
+        os.makedirs(expanduser('~/output/online_sinkhorn'))
+    joblib.dump(results, expanduser('~/output/online_sinkhorn/results_1e6_2.pkl'))
 
-        fs -= fref[None, :]
-        gs -= gref[None, :]
-        axes[0].plot(range(len(errors['f - fref'])), errors['f - fref'])
-        axes[1].plot(range(len(errors['w - wref'])), errors['w - wref'])
-        axes[2].plot(range(len(errors['lya'])), errors['lya'], label=f'm={m}, eta={eta}, s={step_size}avg={avg}')
-    axes[2].legend()
+
+def plot():
+    # results = joblib.load(expanduser('~/output/online_sinkhorn/results_1e6_2.pkl'))
+    results = joblib.load(expanduser('~/output/online_sinkhorn/results_1e5.pkl'))
+    df = []
+    for result in results:
+        for i in range(len(result['errors']['iter'])):
+            df.append(dict(ieta=result["ieta"], eta=result["eta"],
+                           ie=f'{result["ieta"]}_{result["eta"]}',
+                           m=result["m"], iter=result['errors']['iter'][i],
+                      value=result['errors']['rel werr'][i]))
+    df = pd.DataFrame(df)
+    grid = sns.FacetGrid(data=df, col="eta", row="ieta", hue='m')
+    grid.map(plt.plot, "iter", "value")
+    for ax in grid.axes.ravel():
+        ax.set_yscale('log')
+        ax.set_xscale('log')
+        ax.set_ylim([1e-15, 1])
+        ax.set_xlim([1e2, 1e6])
+    grid.add_legend()
+
+    grid = sns.FacetGrid(data=df, col="m", hue='ie')
+    grid.map(plt.plot, "iter", "value")
+    for ax in grid.axes.ravel():
+        ax.set_yscale('log')
+        ax.set_xscale('log')
+        ax.set_ylim([1e-15, 1])
+        ax.set_xlim([1e2, 1e6])
+    grid.add_legend()
+
     plt.show()
 
 
 if __name__ == '__main__':
-    main()
+    # main()
+    plot()
     # one_dimensional_exp()
