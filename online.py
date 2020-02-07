@@ -11,12 +11,13 @@ import matplotlib.pyplot as plt
 from joblib import Memory, delayed, Parallel
 import seaborn as sns
 import pandas as pd
+from matplotlib import gridspec
 
-# from matplotlib import rc
-# import matplotlib
-# matplotlib.rcParams['backend'] = 'pdf'
-# rc('text', usetex=True)
-# import matplotlib.pyplot as plt
+from matplotlib import rc
+import matplotlib
+matplotlib.rcParams['backend'] = 'pdf'
+rc('text', usetex=True)
+import matplotlib.pyplot as plt
 from sklearn.utils import check_random_state
 
 
@@ -249,7 +250,6 @@ def stochastic_sinkhorn_finite_simple(x, y, fref, gref, wref, eps, m, n_iter=100
                 raise ValueError
         else:
             ieta_ = torch.tensor(ieta)
-
         q += eps * torch.log(- ieta_ + 1)
         update = eps * torch.log(ieta_) + logb * eps + g
         q[y_idx] = eps * torch.logsumexp(torch.cat([q[y_idx][None, :], update[None, :]], dim=0) / eps, dim=0)
@@ -353,7 +353,7 @@ def sinkhorn(x, y, eps, n_iter=1000, simultaneous=False):
         g_diff = g - gg
         tol = f_diff.max() - f_diff.min() + g_diff.max() - g_diff.min()
         f, g = ff, gg
-    print('tol', tol)
+        print('tol', tol)
     return f.numpy(), g.numpy()
 
 
@@ -409,7 +409,7 @@ def sampling_sinkhorn(x_sampler, y_sampler, eps, m, grid, n_iter=100, step_size=
         elif step_size == 'linear':
             eta = torch.tensor(1. / (i + 1))
         elif step_size == 'constant':
-            eta = torch.tensor(.9)
+            eta = torch.tensor(1.)
 
         # Update f
         y_, logb = y_sampler(m)
@@ -431,16 +431,13 @@ def sampling_sinkhorn(x_sampler, y_sampler, eps, m, grid, n_iter=100, step_size=
         if i % 10 == 0:
             feval = evaluate_potential(q[:(i + 1) * m], posy[:(i + 1) * m], grid, eps)
             geval = evaluate_potential(p[:(i + 1) * m], posx[:(i + 1) * m], grid, eps)
-            # plan = (x_sampler.log_prob(grid)[:, None] + feval[:, None] / eps + y_sampler.log_prob(grid)[None, :]
-            #         + geval[None, :] / eps - C / eps)
-            # print(torch.logsumexp(plan.view(-1), dim=0))
             fevals.append(feval)
             gevals.append(geval)
     return p, posx, q, posy, fevals, gevals
 
 
 def one_dimensional_exp():
-    eps = 1e-3
+    eps = 1e-2
 
     grid = torch.linspace(-4, 12, 500)[:, None]
     C = compute_distance(grid, grid)
@@ -449,7 +446,8 @@ def one_dimensional_exp():
                         p=torch.ones(3) / 3)
     y_sampler = Sampler(mean=torch.tensor([[0.], [3], [5]]), cov=torch.tensor([[[.1]], [[.1]], [[.4]]]),
                         p=torch.ones(3) / 3)
-
+    torch.manual_seed(100)
+    np.random.seed(100)
     lpx = x_sampler.log_prob(grid)
     lpy = y_sampler.log_prob(grid)
     lpx -= torch.logsumexp(lpx, dim=0)
@@ -462,10 +460,13 @@ def one_dimensional_exp():
     labels = []
     plans = []
 
-    n_samples = 1000
+    mem = Memory(location=expanduser('~/cache'))
+    n_samples = 2000
     x, loga = x_sampler(n_samples)
     y, logb = y_sampler(n_samples)
-    f, g = sinkhorn(x, y, eps=eps, n_iter=100)
+    f, g = mem.cache(sinkhorn)(x.numpy(), y.numpy(), eps=eps, n_iter=100)
+    f = torch.from_numpy(f).float()
+    g = torch.from_numpy(g).float()
     distance = compute_distance(grid, y)
     feval = - eps * torch.logsumexp((- distance + g[None, :]) / eps + logb[None, :], dim=1)
     distance = compute_distance(grid, x)
@@ -478,9 +479,9 @@ def one_dimensional_exp():
 
     fevals.append(feval)
     gevals.append(geval)
-    labels.append(f'Sinkhorn n={n_samples}')
+    labels.append(f'True potential')
 
-    m = 10
+    m = 50
     hatf, posx, hatg, posy, sto_fevals, sto_gevals = sampling_sinkhorn(x_sampler, y_sampler, m=m, eps=eps,
                                                                        n_iter=100,
                                                                        step_size='constant', grid=grid)
@@ -492,29 +493,54 @@ def one_dimensional_exp():
 
     fevals.append(feval)
     gevals.append(geval)
-    labels.append(f'Online Sinkhorn m={m}')
+    labels.append(f'Online Sinkhorn')
     fevals = torch.cat([feval[None, :] for feval in fevals], dim=0)
     gevals = torch.cat([geval[None, :] for geval in gevals], dim=0)
 
-    fig, axes = plt.subplots(4, 1, figsize=(8, 12))
-    fig_plan, axes_plan = plt.subplots(1, 2, figsize=(8, 4))
-    axes[0].plot(grid, px, label='alpha')
-    axes[0].plot(grid, py, label='beta')
-    axes[0].legend()
+    fig = plt.figure(figsize=(8, 1.9))
+    gs = gridspec.GridSpec(ncols=5, nrows=1, width_ratios=[1, 1.2, 1.2, 1, 1], figure=fig)
+    plt.subplots_adjust(right=0.97, left=0.01)
+    ax0 = fig.add_subplot(gs[0])
+    ax0.plot(grid, px, label=r'$\alpha$')
+    ax0.plot(grid, py, label=r'$\beta$')
+    ax0.legend(frameon=False)
+    # ax0.axis('off')
+    ax1 = fig.add_subplot(gs[1])
+    ax2 = fig.add_subplot(gs[2])
+    ax3 = fig.add_subplot(gs[3])
+    ax4 = fig.add_subplot(gs[4])
     for i, (label, feval, geval, (plan, x, y)) in enumerate(zip(labels, fevals, gevals, plans)):
-        axes[1].plot(grid, feval, label=label)
-        axes[2].plot(grid, geval, label=label)
-        plan = plan.numpy()
-        axes_plan[i].contourf(y[:, 0], x[:, 0], plan, levels=30)
-    # axes_plan[1].add_colorbar()
-    colors = plt.cm.get_cmap('Blues')(np.linspace(0.2, 1, len(sto_fevals)))
-    axes[3].set_prop_cycle('color', colors)
-    for eval in sto_fevals:
-        axes[3].plot(grid, eval, label=label)
-    axes[2].legend()
-    axes[0].set_title('Distributions')
-    axes[1].set_title('Potential f')
-    axes[2].set_title('Potential g')
+        if label == 'True potential':
+            ax1.plot(grid, feval, label=label, zorder=100 if label == 'True Potential' else 1,
+                     linewidth=4 if label == 'True potential' else 1, color='C3')
+            ax2.plot(grid, geval, label=label, zorder=100 if label == 'True Potential' else 1,
+                     linewidth=4 if label == 'True potential' else 1, color='C3')
+            plan = plan.numpy()
+            ax3.contour(y[:, 0], x[:, 0], plan, levels=30)
+        else:
+            plan = plan.numpy()
+            ax4.contour(y[:, 0], x[:, 0], plan, levels=30)
+    ax0.set_title('Distributions')
+    ax1.set_title('Estimated $f$')
+    ax2.set_title('Estimated $g$')
+    ax3.set_title('True OT plan')
+    ax4.set_title('Estimated OT plan')
+    # ax4.set_title('Estimated OT plan')
+    colors = plt.cm.get_cmap('Blues')(np.linspace(0.2, 1, len(sto_fevals[::2])))
+    for i, eval in enumerate(sto_fevals[::2]):
+        ax1.plot(grid, eval, color=colors[i],
+                 linewidth=2, label='Online Sinkhorn' if i == len(sto_fevals[::2]) - 1 else None,
+                 zorder=1)
+    for i, eval in enumerate(sto_gevals[::2]):
+        ax2.plot(grid, eval, color=colors[i],
+                 linewidth=2, label=f'$n_t={i*10*2*50}$' if i % 2 == 0 else None,
+                 zorder=1)
+    ax2.legend(frameon=False, bbox_to_anchor=(0., 1), loc='upper left')
+    sns.despine(fig)
+    for ax in [ax3, ax4]:
+        ax.axis('off')
+    ax0.axes.get_yaxis().set_visible(False)
+    plt.savefig('continuous.pdf')
     plt.show()
 
 
@@ -592,7 +618,7 @@ def simple():
                                   for m in [5]
                                   for eta in ['1/sqrt(t)']
                                   for random_state in [1]
-                                  for averaging in ['primal', 'none']
+                                  for averaging in ['dual']
                                   for last_transform in [True]
                                   for first_transform in [False]
                                   for alternated in [False]
@@ -630,7 +656,7 @@ def plot():
 
 
 if __name__ == '__main__':
-    simple()
+    # simple()
     # main()
-    plot()
-    # one_dimensional_exp()
+    # plot()
+    one_dimensional_exp()

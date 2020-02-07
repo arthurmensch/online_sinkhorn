@@ -2,10 +2,10 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="adf0c6cb-11cd-42ce-863c-8da01b12a349" name="Default Changelist" comment="">
-      <change afterPath="$PROJECT_DIR$/averaging.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/icml/online.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/icml/online.py" beforeDir="false" afterPath="$PROJECT_DIR$/icml/online.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/online.py" beforeDir="false" afterPath="$PROJECT_DIR$/online.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/sinkhorn.py" beforeDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -57,29 +57,7 @@
     </key>
   </component>
   <component name="RunManager" selected="Python.online">
-    <configuration name="averaging" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
-      <module name="online_sinkhorn" />
-      <option name="INTERPRETER_OPTIONS" value="" />
-      <option name="PARENT_ENVS" value="true" />
-      <envs>
-        <env name="PYTHONUNBUFFERED" value="1" />
-      </envs>
-      <option name="SDK_HOME" value="" />
-      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
-      <option name="IS_MODULE_SDK" value="true" />
-      <option name="ADD_CONTENT_ROOTS" value="true" />
-      <option name="ADD_SOURCE_ROOTS" value="true" />
-      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
-      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/averaging.py" />
-      <option name="PARAMETERS" value="" />
-      <option name="SHOW_COMMAND_LINE" value="false" />
-      <option name="EMULATE_TERMINAL" value="false" />
-      <option name="MODULE_MODE" value="false" />
-      <option name="REDIRECT_INPUT" value="false" />
-      <option name="INPUT_FILE" value="" />
-      <method v="2" />
-    </configuration>
-    <configuration name="online (local)" type="PythonConfigurationType" factoryName="Python">
+    <configuration name="online (1)" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
       <module name="online_sinkhorn" />
       <option name="INTERPRETER_OPTIONS" value="" />
       <option name="PARENT_ENVS" value="true" />
@@ -123,14 +101,36 @@
       <option name="INPUT_FILE" value="" />
       <method v="2" />
     </configuration>
+    <configuration name="online" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
+      <module name="online_sinkhorn" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/icml" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/icml/online.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
     <list>
       <item itemvalue="Python.online" />
-      <item itemvalue="Python.online (local)" />
-      <item itemvalue="Python.averaging" />
+      <item itemvalue="Python.online (1)" />
     </list>
     <recent_temporary>
       <list>
-        <item itemvalue="Python.averaging" />
+        <item itemvalue="Python.online" />
+        <item itemvalue="Python.online (1)" />
       </list>
     </recent_temporary>
   </component>
@@ -171,78 +171,82 @@
   </component>
   <component name="VcsManagerConfiguration">
     <MESSAGE value="Not converging" />
-    <MESSAGE value="WIP" />
     <MESSAGE value="WIP figures" />
     <MESSAGE value="Alternated" />
     <MESSAGE value="WIP averaging dual - primal" />
     <MESSAGE value="Testing diaconis idea" />
     <MESSAGE value="WIP testing" />
-    <option name="LAST_COMMIT_MESSAGE" value="WIP testing" />
+    <MESSAGE value="WIP" />
+    <option name="LAST_COMMIT_MESSAGE" value="WIP" />
   </component>
   <component name="WindowStateProjectService">
     <state x="554" y="214" width="802" height="677" key="#Deployment" timestamp="1580654668103">
       <screen x="0" y="27" width="1920" height="1053" />
     </state>
     <state x="554" y="214" width="802" height="677" key="#Deployment/0.27.1920.1053@0.27.1920.1053" timestamp="1580654668103" />
-    <state x="553" y="298" key="#com.intellij.execution.impl.EditConfigurationsDialog" timestamp="1580654881367">
-      <screen x="0" y="27" width="1920" height="1053" />
-    </state>
-    <state x="553" y="298" key="#com.intellij.execution.impl.EditConfigurationsDialog/0.27.1920.1053@0.27.1920.1053" timestamp="1580654881367" />
-    <state x="737" y="390" key="#com.intellij.execution.impl.EditConfigurationsDialog/0.27.2560.1413@0.27.2560.1413" timestamp="1579895107411" />
-    <state x="713" y="184" width="846" height="809" key="CommitChangelistDialog2" timestamp="1580818743580">
+    <state x="737" y="390" key="#com.intellij.execution.impl.EditConfigurationsDialog" timestamp="1581039816091">
       <screen x="0" y="27" width="2560" height="1413" />
     </state>
-    <state x="535" y="136" width="845" height="817" key="CommitChangelistDialog2/0.27.1920.1053@0.27.1920.1053" timestamp="1580633536065" />
+    <state x="553" y="298" key="#com.intellij.execution.impl.EditConfigurationsDialog/0.27.1920.1053@0.27.1920.1053" timestamp="1580654881367" />
+    <state x="737" y="390" key="#com.intellij.execution.impl.EditConfigurationsDialog/0.27.2560.1413@0.27.2560.1413" timestamp="1581039816091" />
+    <state x="535" y="136" width="846" height="809" key="CommitChangelistDialog2" timestamp="1580915501228">
+      <screen x="0" y="27" width="1920" height="1053" />
+    </state>
+    <state x="535" y="136" width="845" height="817" key="CommitChangelistDialog2/0.27.1920.1053@0.27.1920.1053" timestamp="1580915501228" />
     <state x="713" y="184" width="846" height="809" key="CommitChangelistDialog2/0.27.2560.1413@0.27.2560.1413" timestamp="1580818743580" />
-    <state x="969" y="387" width="455" height="515" key="FileChooserDialogImpl" timestamp="1580830176898">
+    <state x="100" y="127" width="1720" height="853" key="DiffContextDialog" timestamp="1580919859409">
+      <screen x="0" y="27" width="1920" height="1053" />
+    </state>
+    <state x="100" y="127" width="1720" height="853" key="DiffContextDialog/0.27.1920.1053@0.27.1920.1053" timestamp="1580919859409" />
+    <state x="969" y="387" width="426" height="514" key="FileChooserDialogImpl" timestamp="1581013481150">
       <screen x="0" y="27" width="2560" height="1413" />
     </state>
     <state x="727" y="295" width="455" height="515" key="FileChooserDialogImpl/0.27.1920.1053@0.27.1920.1053" timestamp="1580562650320" />
-    <state x="969" y="387" key="FileChooserDialogImpl/0.27.2560.1413@0.27.2560.1413" timestamp="1580830176898" />
-    <state width="1872" height="303" key="GridCell.Tab.0.bottom" timestamp="1580911316352">
-      <screen x="0" y="27" width="1920" height="1053" />
+    <state x="969" y="387" width="426" height="514" key="FileChooserDialogImpl/0.27.2560.1413@0.27.2560.1413" timestamp="1581013481150" />
+    <state width="2512" height="431" key="GridCell.Tab.0.bottom" timestamp="1581051162385">
+      <screen x="0" y="27" width="2560" height="1413" />
     </state>
-    <state width="1872" height="303" key="GridCell.Tab.0.bottom/0.27.1920.1053@0.27.1920.1053" timestamp="1580911316352" />
+    <state width="1872" height="303" key="GridCell.Tab.0.bottom/0.27.1920.1053@0.27.1920.1053" timestamp="1580922347636" />
     <state width="2512" height="486" key="GridCell.Tab.0.bottom/0.27.2560.1413/2560.0.3840.2160@0.27.2560.1413" timestamp="1580736316379" />
-    <state width="2512" height="486" key="GridCell.Tab.0.bottom/0.27.2560.1413@0.27.2560.1413" timestamp="1580836211466" />
-    <state width="1872" height="303" key="GridCell.Tab.0.center" timestamp="1580911316350">
-      <screen x="0" y="27" width="1920" height="1053" />
+    <state width="2512" height="431" key="GridCell.Tab.0.bottom/0.27.2560.1413@0.27.2560.1413" timestamp="1581051162385" />
+    <state width="2512" height="431" key="GridCell.Tab.0.center" timestamp="1581051162384">
+      <screen x="0" y="27" width="2560" height="1413" />
     </state>
-    <state width="1872" height="303" key="GridCell.Tab.0.center/0.27.1920.1053@0.27.1920.1053" timestamp="1580911316350" />
+    <state width="1872" height="303" key="GridCell.Tab.0.center/0.27.1920.1053@0.27.1920.1053" timestamp="1580922347636" />
     <state width="2512" height="486" key="GridCell.Tab.0.center/0.27.2560.1413/2560.0.3840.2160@0.27.2560.1413" timestamp="1580736316379" />
-    <state width="2512" height="486" key="GridCell.Tab.0.center/0.27.2560.1413@0.27.2560.1413" timestamp="1580836211465" />
-    <state width="1872" height="303" key="GridCell.Tab.0.left" timestamp="1580911316349">
-      <screen x="0" y="27" width="1920" height="1053" />
+    <state width="2512" height="431" key="GridCell.Tab.0.center/0.27.2560.1413@0.27.2560.1413" timestamp="1581051162384" />
+    <state width="2512" height="431" key="GridCell.Tab.0.left" timestamp="1581051162383">
+      <screen x="0" y="27" width="2560" height="1413" />
     </state>
-    <state width="1872" height="303" key="GridCell.Tab.0.left/0.27.1920.1053@0.27.1920.1053" timestamp="1580911316349" />
+    <state width="1872" height="303" key="GridCell.Tab.0.left/0.27.1920.1053@0.27.1920.1053" timestamp="1580922347636" />
     <state width="2512" height="486" key="GridCell.Tab.0.left/0.27.2560.1413/2560.0.3840.2160@0.27.2560.1413" timestamp="1580736316379" />
-    <state width="2512" height="486" key="GridCell.Tab.0.left/0.27.2560.1413@0.27.2560.1413" timestamp="1580836211465" />
-    <state width="1872" height="303" key="GridCell.Tab.0.right" timestamp="1580911316351">
-      <screen x="0" y="27" width="1920" height="1053" />
+    <state width="2512" height="431" key="GridCell.Tab.0.left/0.27.2560.1413@0.27.2560.1413" timestamp="1581051162383" />
+    <state width="2512" height="431" key="GridCell.Tab.0.right" timestamp="1581051162385">
+      <screen x="0" y="27" width="2560" height="1413" />
     </state>
-    <state width="1872" height="303" key="GridCell.Tab.0.right/0.27.1920.1053@0.27.1920.1053" timestamp="1580911316351" />
+    <state width="1872" height="303" key="GridCell.Tab.0.right/0.27.1920.1053@0.27.1920.1053" timestamp="1580922347636" />
     <state width="2512" height="486" key="GridCell.Tab.0.right/0.27.2560.1413/2560.0.3840.2160@0.27.2560.1413" timestamp="1580736316379" />
-    <state width="2512" height="486" key="GridCell.Tab.0.right/0.27.2560.1413@0.27.2560.1413" timestamp="1580836211466" />
-    <state width="2512" height="484" key="GridCell.Tab.1.bottom" timestamp="1578937519676">
+    <state width="2512" height="431" key="GridCell.Tab.0.right/0.27.2560.1413@0.27.2560.1413" timestamp="1581051162385" />
+    <state width="2512" height="482" key="GridCell.Tab.1.bottom" timestamp="1581024820501">
       <screen x="0" y="27" width="2560" height="1413" />
     </state>
-    <state width="2512" height="484" key="GridCell.Tab.1.bottom/0.27.1920.1053@0.27.1920.1053" timestamp="1576778857522" />
-    <state width="2512" height="484" key="GridCell.Tab.1.bottom/0.27.2560.1413@0.27.2560.1413" timestamp="1578937519676" />
-    <state width="2512" height="484" key="GridCell.Tab.1.center" timestamp="1578937519676">
+    <state width="1872" height="340" key="GridCell.Tab.1.bottom/0.27.1920.1053@0.27.1920.1053" timestamp="1580920152933" />
+    <state width="2512" height="482" key="GridCell.Tab.1.bottom/0.27.2560.1413@0.27.2560.1413" timestamp="1581024820501" />
+    <state width="2512" height="482" key="GridCell.Tab.1.center" timestamp="1581024820500">
       <screen x="0" y="27" width="2560" height="1413" />
     </state>
-    <state width="2512" height="484" key="GridCell.Tab.1.center/0.27.1920.1053@0.27.1920.1053" timestamp="1576778857521" />
-    <state width="2512" height="484" key="GridCell.Tab.1.center/0.27.2560.1413@0.27.2560.1413" timestamp="1578937519676" />
-    <state width="2512" height="484" key="GridCell.Tab.1.left" timestamp="1578937519675">
+    <state width="1872" height="340" key="GridCell.Tab.1.center/0.27.1920.1053@0.27.1920.1053" timestamp="1580920152933" />
+    <state width="2512" height="482" key="GridCell.Tab.1.center/0.27.2560.1413@0.27.2560.1413" timestamp="1581024820500" />
+    <state width="2512" height="482" key="GridCell.Tab.1.left" timestamp="1581024820500">
       <screen x="0" y="27" width="2560" height="1413" />
     </state>
-    <state width="2512" height="484" key="GridCell.Tab.1.left/0.27.1920.1053@0.27.1920.1053" timestamp="1576778857521" />
-    <state width="2512" height="484" key="GridCell.Tab.1.left/0.27.2560.1413@0.27.2560.1413" timestamp="1578937519675" />
-    <state width="2512" height="484" key="GridCell.Tab.1.right" timestamp="1578937519676">
+    <state width="1872" height="340" key="GridCell.Tab.1.left/0.27.1920.1053@0.27.1920.1053" timestamp="1580920152932" />
+    <state width="2512" height="482" key="GridCell.Tab.1.left/0.27.2560.1413@0.27.2560.1413" timestamp="1581024820500" />
+    <state width="2512" height="482" key="GridCell.Tab.1.right" timestamp="1581024820500">
       <screen x="0" y="27" width="2560" height="1413" />
     </state>
-    <state width="2512" height="484" key="GridCell.Tab.1.right/0.27.1920.1053@0.27.1920.1053" timestamp="1576778857522" />
-    <state width="2512" height="484" key="GridCell.Tab.1.right/0.27.2560.1413@0.27.2560.1413" timestamp="1578937519676" />
+    <state width="1872" height="340" key="GridCell.Tab.1.right/0.27.1920.1053@0.27.1920.1053" timestamp="1580920152933" />
+    <state width="2512" height="482" key="GridCell.Tab.1.right/0.27.2560.1413@0.27.2560.1413" timestamp="1581024820500" />
     <state x="576" y="281" key="SettingsEditor" timestamp="1580654871649">
       <screen x="0" y="27" width="1920" height="1053" />
     </state>
@@ -252,29 +256,45 @@
       <screen x="0" y="27" width="1920" height="1053" />
     </state>
     <state width="498" height="452" key="SwitcherDM/0.27.1920.1053@0.27.1920.1053" timestamp="1580646918432" />
-    <state x="874" y="468" width="802" height="528" key="Vcs.Push.Dialog.v2" timestamp="1580818744493">
+    <state x="656" y="348" width="802" height="528" key="Vcs.Push.Dialog.v2" timestamp="1580915504076">
+      <screen x="0" y="27" width="1920" height="1053" />
+    </state>
+    <state x="656" y="348" width="802" height="528" key="Vcs.Push.Dialog.v2/0.27.1920.1053@0.27.1920.1053" timestamp="1580915504076" />
+    <state x="874" y="468" width="802" height="528" key="Vcs.Push.Dialog.v2/0.27.2560.1413@0.27.2560.1413" timestamp="1580818744493" />
+    <state width="1280" height="706" key="XDebugger.FullValuePopup" timestamp="1581024799235">
       <screen x="0" y="27" width="2560" height="1413" />
     </state>
-    <state x="656" y="348" key="Vcs.Push.Dialog.v2/0.27.1920.1053@0.27.1920.1053" timestamp="1580633538234" />
-    <state x="874" y="468" width="802" height="528" key="Vcs.Push.Dialog.v2/0.27.2560.1413@0.27.2560.1413" timestamp="1580818744493" />
+    <state width="1280" height="706" key="XDebugger.FullValuePopup/0.27.2560.1413@0.27.2560.1413" timestamp="1581024799235" />
+    <state x="932" y="350" width="685" height="764" key="com.intellij.openapi.editor.actions.MultiplePasteAction$ClipboardContentChooser" timestamp="1581026507746">
+      <screen x="0" y="27" width="2560" height="1413" />
+    </state>
+    <state x="932" y="350" width="685" height="764" key="com.intellij.openapi.editor.actions.MultiplePasteAction$ClipboardContentChooser/0.27.2560.1413@0.27.2560.1413" timestamp="1581026507746" />
     <state x="1051" y="652" width="447" height="160" key="com.intellij.openapi.vcs.update.UpdateOrStatusOptionsDialogupdate-v2" timestamp="1578925811424">
       <screen x="0" y="27" width="2560" height="1413" />
     </state>
     <state x="1051" y="652" width="447" height="160" key="com.intellij.openapi.vcs.update.UpdateOrStatusOptionsDialogupdate-v2/0.27.2560.1413@0.27.2560.1413" timestamp="1578925811424" />
+    <state x="504" y="291" width="901" height="522" key="com.intellij.xdebugger.impl.breakpoints.ui.BreakpointsDialogFactory$2" timestamp="1580920149251">
+      <screen x="0" y="27" width="1920" height="1053" />
+    </state>
+    <state x="504" y="291" width="901" height="522" key="com.intellij.xdebugger.impl.breakpoints.ui.BreakpointsDialogFactory$2/0.27.1920.1053@0.27.1920.1053" timestamp="1580920149251" />
     <state x="610" y="280" width="700" height="546" key="find.popup" timestamp="1580891374033">
       <screen x="0" y="27" width="1920" height="1053" />
     </state>
     <state x="610" y="280" width="700" height="546" key="find.popup/0.27.1920.1053@0.27.1920.1053" timestamp="1580891374033" />
     <state x="813" y="366" width="934" height="733" key="find.popup/0.27.2560.1413@0.27.2560.1413" timestamp="1580824855615" />
+    <state width="600" height="424" key="javadoc.popup" timestamp="1581027271142">
+      <screen x="0" y="27" width="2560" height="1413" />
+    </state>
+    <state width="600" height="424" key="javadoc.popup/0.27.2560.1413@0.27.2560.1413" timestamp="1581027271142" />
     <state x="705" y="425" width="714" height="303" key="org.intellij.images.editor.actions.BackgroundImageDialog" timestamp="1580562633470">
       <screen x="0" y="27" width="1920" height="1053" />
     </state>
     <state x="705" y="425" width="714" height="303" key="org.intellij.images.editor.actions.BackgroundImageDialog/0.27.1920.1053@0.27.1920.1053" timestamp="1580562633470" />
-    <state x="831" y="330" width="896" height="910" key="search.everywhere.popup" timestamp="1580829589588">
+    <state x="831" y="330" width="896" height="910" key="search.everywhere.popup" timestamp="1581024113027">
       <screen x="0" y="27" width="2560" height="1413" />
     </state>
     <state x="623" y="253" width="672" height="678" key="search.everywhere.popup/0.27.1920.1053@0.27.1920.1053" timestamp="1580654661897" />
-    <state x="831" y="330" width="896" height="910" key="search.everywhere.popup/0.27.2560.1413@0.27.2560.1413" timestamp="1580829589588" />
+    <state x="831" y="330" width="896" height="910" key="search.everywhere.popup/0.27.2560.1413@0.27.2560.1413" timestamp="1581024113027" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
@@ -328,12 +348,14 @@
     </breakpoint-manager>
     <watches-manager>
       <configuration name="PythonConfigurationType">
-        <watch expression="torch.exp(loga)" language="Python" />
+        <watch expression="res.groupby(by=['index', 'iter'])" language="Python" />
+        <watch expression="res.groupby(by=['index', 'iter']).aggregate(['mean', 'std'])" language="Python" />
       </configuration>
     </watches-manager>
   </component>
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
     <SUITE FILE_PATH="coverage/online_sinkhorn$optimize.coverage" NAME="optimize Coverage Results" MODIFIED="1574594560888" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/online_sinkhorn$online__1_.coverage" NAME="online Coverage Results" MODIFIED="1581051108997" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/icml" />
     <SUITE FILE_PATH="coverage/online_sinkhorn$infinite.coverage" NAME="infinite Coverage Results" MODIFIED="1578662337595" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/online_sinkhorn$recursion.coverage" NAME="recursion Coverage Results" MODIFIED="1579895196425" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/online_sinkhorn$jax.coverage" NAME="jax Coverage Results" MODIFIED="1571835663542" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
@@ -344,7 +366,7 @@
     <SUITE FILE_PATH="coverage/online_sinkhorn$gw.coverage" NAME="gw Coverage Results" MODIFIED="1574595020683" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/online_sinkhorn$unrolled.coverage" NAME="unrolled Coverage Results" MODIFIED="1571235341496" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/online_sinkhorn$saddles.coverage" NAME="saddles Coverage Results" MODIFIED="1575656324382" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
-    <SUITE FILE_PATH="coverage/online_sinkhorn$online.coverage" NAME="online Coverage Results" MODIFIED="1580908379568" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/online_sinkhorn$online.coverage" NAME="online Coverage Results" MODIFIED="1580916087592" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/online_sinkhorn$online__local_.coverage" NAME="online (local) Coverage Results" MODIFIED="1580721739164" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
   </component>
 </project>
