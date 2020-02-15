@@ -13,8 +13,8 @@ import torch
 from joblib import Memory, delayed, Parallel
 from matplotlib import rc
 
-matplotlib.rcParams['backend'] = 'pdf'
-rc('text', usetex=True)
+# matplotlib.rcParams['backend'] = 'pdf'
+# rc('text', usetex=True)
 import matplotlib.pyplot as plt
 from sklearn.model_selection import ParameterGrid
 from sklearn.utils import check_random_state, gen_batches
@@ -68,16 +68,20 @@ def sample_from_finite(x, m, random_state=None, full_after_one=False, replacemen
             yield np.arange(x.shape[0]), torch.full((n,), fill_value=-math.log(n))
         else:
             if replacement:
-                indices = random_state.permutation(n)[:m]
+                if n == m:
+                    indices = np.arange(n)
+                else:
+                    indices = random_state.permutation(n)[:m]
                 loga = torch.full((m,), fill_value=-math.log(m))
                 yield indices, loga
-            indices = random_state.permutation(n)
-            for batches in gen_batches(x.shape[0], m):
-                these_indices = indices[batches]
-                this_m = len(these_indices)
-                loga = torch.full((this_m,), fill_value=-math.log(this_m))
-                yield these_indices, loga
-            first_iter = False
+            else:
+                indices = random_state.permutation(n)
+                for batches in gen_batches(x.shape[0], m):
+                    these_indices = indices[batches]
+                    this_m = len(these_indices)
+                    loga = torch.full((this_m,), fill_value=-math.log(this_m))
+                    yield these_indices, loga
+                first_iter = False
 
 
 def sample_from(x, m):
@@ -104,17 +108,21 @@ def evaluate_potential_finite(log_pot: torch.tensor, idx: torch.tensor, distance
     return - eps * torch.logsumexp((- distance[idx] + log_pot[None, :]) / eps, dim=1)
 
 
-def online_sinkhorn(x, y, eps, m, n_iter=100, random_state=None, resample=True, ieta=1., eta=1., alternate=True,
-                    full_after_one=False, replacement=False):
+def online_sinkhorn(x, y, eps, fref, gref, n_iter=100, random_state=None, resample=True, ieta=1.,
+                    samplingx=None, samplingy=None,
+                    eta=1., alternate=False, replacement=True):
     random_state = check_random_state(random_state)
     torch.manual_seed(random_state.randint(100000))
 
     x = torch.from_numpy(x)
     y = torch.from_numpy(y)
+    fref = torch.from_numpy(fref)
+    gref = torch.from_numpy(gref)
 
     n = x.shape[0]
+    m = y.shape[0]
     p = torch.full((n,), fill_value=-float('inf'), dtype=x.dtype)
-    q = torch.full((n,), fill_value=-float('inf'), dtype=x.dtype)
+    q = torch.full((m,), fill_value=-float('inf'), dtype=x.dtype)
 
     avg_p = p.clone()
     avg_q = q.clone()
@@ -124,9 +132,14 @@ def online_sinkhorn(x, y, eps, m, n_iter=100, random_state=None, resample=True, 
     u_eta = not isinstance(eta, float)
     u_ieta = not isinstance(ieta, float)
 
-    y_sampler = sample_from_finite(y, m, random_state=random_state, full_after_one=full_after_one,
-                                   replacement=replacement  )
-    x_sampler = sample_from_finite(x, m, random_state=random_state, full_after_one=full_after_one,
+    if samplingx is None:
+        samplingx = x.shape[0]
+    if samplingy is None:
+        samplingy = y.shape[0]
+
+    y_sampler = sample_from_finite(y, samplingy, random_state=random_state,
+                                   replacement=replacement)
+    x_sampler = sample_from_finite(x, samplingx, random_state=random_state,
                                    replacement=replacement)
     y_idx, logb = next(y_sampler)
     x_idx, loga = next(x_sampler)
@@ -137,19 +150,24 @@ def online_sinkhorn(x, y, eps, m, n_iter=100, random_state=None, resample=True, 
         if i % 1 == 0:
             if i == 0:
                 ff = torch.zeros(n, dtype=x.dtype)
-                gg = torch.zeros(n, dtype=x.dtype)
+                gg = torch.zeros(m, dtype=x.dtype)
             else:
                 ff = evaluate_potential_finite(avg_q, slice(None), distance, eps)
                 gg = evaluate_potential_finite(avg_p, slice(None), distance.transpose(0, 1), eps)
-
-            fff = evaluate_potential_finite(gg + math.log(1 / n) * eps, slice(None), distance, eps)
+            fff = evaluate_potential_finite(gg + math.log(1 / m) * eps, slice(None), distance, eps)
             ggg = evaluate_potential_finite(ff + math.log(1 / n) * eps, slice(None), distance.transpose(0, 1),
                                             eps)
             ff = (ff + fff) / 2
             gg = (gg + ggg) / 2
+            lya = (-ff.mean() - gg.mean() + fref.mean() + gref.mean()
+                   + eps * torch.logsumexp(((ff[:, None] + math.log(1 / m) * eps +
+                                             math.log(1 / n) * eps + gref[None, :] - distance) / eps).view(-1), dim=0)
+                   + eps * torch.logsumexp(((fref[:, None] + math.log(1 / m) * eps +
+                                             math.log(1 / n) * eps + gg[None, :] - distance) / eps).view(-1), dim=0))
             w = (ff.mean() + gg.mean())
             errors['ff'].append(ff.numpy())
             errors['gg'].append(gg.numpy())
+            errors['lya'].append(lya.numpy())
             errors['w'].append(w.item())
             errors['computation'].append(computations)
             errors['true_computation'].append(true_computations)
@@ -159,49 +177,44 @@ def online_sinkhorn(x, y, eps, m, n_iter=100, random_state=None, resample=True, 
         if resample:
             y_idx, logb = next(y_sampler)
             x_idx, loga = next(x_sampler)
-        full = len(y_idx) == n
         if i > 0:
             g = evaluate_potential_finite(p, y_idx, distance.transpose(0, 1), eps)
             if not alternate:
                 f = evaluate_potential_finite(q, x_idx, distance, eps)
         else:
-            g = torch.zeros(m, dtype=x.dtype)
+            g = torch.zeros(samplingy, dtype=x.dtype)
             if not alternate:
-                f = torch.zeros(m, dtype=x.dtype)
+                f = torch.zeros(samplingx, dtype=x.dtype)
 
-        if full and full_after_one:
-            eta_ = torch.tensor(1.)
-            ieta_ = torch.tensor(1.)
+        if u_ieta:
+            if ieta == '1/t':
+                ieta_ = torch.tensor(1 / (i + 1))
+            elif ieta == '1/sqrt(t)':
+                ieta_ = torch.tensor(1 / math.sqrt(i + 1))
+            else:
+                raise ValueError
         else:
-            if u_ieta:
-                if ieta == '1/t':
-                    ieta_ = torch.tensor(1 / (i + 1))
-                elif ieta == '1/sqrt(t)':
-                    ieta_ = torch.tensor(1 / math.sqrt(i + 1))
-                else:
-                    raise ValueError
+            ieta_ = torch.tensor(ieta)
+        if u_eta:
+            if eta == '1/t':
+                eta_ = torch.tensor(1 / (i + 1))
+            elif eta == '1/sqrt(t)':
+                eta_ = torch.tensor(1 / math.sqrt(i + 1))
             else:
-                ieta_ = torch.tensor(ieta)
-            if u_eta:
-                if eta == '1/t':
-                    eta_ = torch.tensor(1 / (i + 1))
-                elif eta == '1/sqrt(t)':
-                    eta_ = torch.tensor(1 / math.sqrt(i + 1))
-                else:
-                    raise ValueError
-            else:
-                eta_ = torch.tensor(eta)
+                raise ValueError
+        else:
+            eta_ = torch.tensor(eta)
 
         q += eps * torch.log(- ieta_ + 1)
         update = eps * torch.log(ieta_) + logb * eps + g
         q[y_idx] = eps * torch.logsumexp(torch.cat([q[y_idx][None, :], update[None, :]], dim=0) / eps, dim=0)
-
+        # q += evaluate_potential_finite(q, [0], distance, eps)
         if alternate:
             f = evaluate_potential_finite(q, x_idx, distance, eps)
         p += eps * torch.log(- ieta_ + 1)
         update = eps * torch.log(ieta_) + loga * eps + f
         p[x_idx] = eps * torch.logsumexp(torch.cat([p[x_idx][None, :], update[None, :]], dim=0) / eps, dim=0)
-
+        # p += evaluate_potential_finite(p, [0], distance.transpose(0, 1), eps)
         avg_q += eps * torch.log(- eta_ + 1)
         update = eps * torch.log(eta_) + q[y_idx]
         avg_q[y_idx] = eps * torch.logsumexp(torch.cat([update[None, :], avg_q[y_idx][None, :]]) / eps, dim=0)
@@ -210,39 +223,86 @@ def online_sinkhorn(x, y, eps, m, n_iter=100, random_state=None, resample=True, 
         update = eps * torch.log(eta_) + p[x_idx]
         avg_p[x_idx] = eps * torch.logsumexp(torch.cat([update[None, :], avg_p[x_idx][None, :]]) / eps, dim=0)
 
-        if full:
-            computations += n ** 2
-        else:
-            computations += len(y_idx) * min(len(y_idx) * (i + 1), n)
-            true_computations += len(y_idx) * len(y_idx) * (i + 1)
+        computations += len(y_idx) * min(len(y_idx) * (i + 1), n)
+        true_computations += len(y_idx) * len(y_idx) * (i + 1)
     return (y, avg_q), (x, avg_p), errors
 
 
+def francis(x, y, eps, m, n_iter=100, random_state=None, sigma=1e-1):
+    random_state = check_random_state(random_state)
+    torch.manual_seed(random_state.randint(100000))
 
-def sinkhorn(x, y, eps, n_iter=1000, m=None):
     x = torch.from_numpy(x)
     y = torch.from_numpy(y)
-    if m is None:
-        m = x.shape[0]
-    x, loga = sample_from(x, m)
-    y, logb = sample_from(y, m)
 
     n = x.shape[0]
 
+    posx = torch.zeros(m * n_iter, 1)
+    posy = torch.zeros(m * n_iter, 1)
+    q = torch.full((m * n_iter,), fill_value=-float('inf'))
+    p = torch.full((m * n_iter,), fill_value=-float('inf'))
+
+    posy = torch.zeros(m * n_iter, 1)
+
+    distance = compute_distance(x, y)
+    errors = defaultdict(list)
+
+    fevals = []
+    gevals = []
+    for i in range(0, n_iter):
+        eta = torch.tensor(i + 1.).pow(torch.tensor(-0.5))
+
+        # Update f
+        y_, logb = y_sampler(m)
+        x_, loga = x_sampler(m)
+        if i > 0:
+            f = evaluate_kernelw(p[:i * m], posx[:i * m], x_, sigma)
+            g = evaluate_kernelw(p[:i * m], posx[:i * m], y_, sigma)
+        else:
+            g = torch.zeros(m)
+        q[:i * m] += eps * torch.log(1 - eta)
+        q[i * m:(i + 1) * m] = eps * math.log(eta) + logb * eps + g
+        posy[i * m:(i + 1) * m] = y_
+
+        # Update g
+        f = evaluate_potential(q[:(i + 1) * m], posy[:(i + 1) * m], x_, eps)
+        p[:i * m] += eps * torch.log(1 - eta)
+        p[i * m:(i + 1) * m] = eps * math.log(eta) + loga * eps + f
+        posx[i * m:(i + 1) * m] = x_
+
+        if i % 10 == 0:
+            feval = evaluate_potential(q[:(i + 1) * m], posy[:(i + 1) * m], grid, eps)
+            geval = evaluate_potential(p[:(i + 1) * m], posx[:(i + 1) * m], grid, eps)
+            fevals.append(feval)
+            gevals.append(geval)
+
+
+def sinkhorn(x, y, eps, n_iter=1000, samplingx=None, samplingy=None):
+    x = torch.from_numpy(x)
+    y = torch.from_numpy(y)
+
+    loga = -math.log(len(x))
+    logb = -math.log(len(y))
+
+    m = y.shape[0]
+
     distance = compute_distance(x, y)
 
-    g = torch.zeros((n,), dtype=torch.float64)
-    f = evaluate_potential_finite(g + eps * logb, slice(None), distance.transpose(0, 1), eps)
+    g = torch.zeros((m,), dtype=torch.float64)
+    f = evaluate_potential_finite(g + eps * logb, slice(None), distance, eps)
     errors = defaultdict(list)
     for i in range(n_iter):
-        g = evaluate_potential_finite(f + eps * logb, slice(None), distance.transpose(0, 1), eps)
+        gg = evaluate_potential_finite(f + eps * loga, slice(None), distance.transpose(0, 1), eps)
+        g_diff = g - gg
+        g = gg
         f = evaluate_potential_finite(g + eps * logb, slice(None), distance, eps)
         w = (f.mean() + g.mean())
+        tol = g_diff.max() - g_diff.min()
         errors['ff'].append(f.numpy())
         errors['gg'].append(g.numpy())
         errors['w'].append(w.item())
         errors['iter'].append(i)
-    return (y, g + eps * logb), (x, f + eps * logb), errors
+    return (y, g + eps * logb), (x, f + eps * loga), errors
 
 
 def simple():
@@ -261,8 +321,9 @@ def simple():
 
     mem = Memory(location=expanduser('~/cache'))
     mem = Memory(location=None)
-    parameters = ParameterGrid(dict(m=[20, 50, 100], eta=['1/sqrt(t)', 1., '1/t'], ieta=['1/sqrt(t)', 1., '1/t'], resample=[True],
-                                    replacement=[True, False], random_state=[1]))
+    parameters = ParameterGrid(
+        dict(m=[20, 50, 100], eta=['1/sqrt(t)', 1., '1/t'], ieta=['1/sqrt(t)', 1., '1/t'], resample=[True],
+             replacement=[True, False], random_state=[1]))
     baseline_parameters = ParameterGrid(dict(m=[50, 100, 1000], eta=[1.], ieta=[1.],
                                              resample=[False], alternate=[True], replacement=[False],
                                              ))
@@ -271,17 +332,18 @@ def simple():
         delayed(mem.cache(online_sinkhorn))(x, y, eps=eps, n_iter=int(1e3), **parameter) for parameter in parameters)
     if not os.path.exists(expanduser('~/output/online_sinkhorn')):
         os.makedirs(expanduser('~/output/online_sinkhorn'))
-    joblib.dump((results, parameters), expanduser(f'~/output/online_sinkhorn/high_dim.pkl'))
+    joblib.dump((results, parameters), expanduser(f'~/output/online_sinkhorn/smally.pkl'))
 
 
 def plot():
-    results, parameters = joblib.load(expanduser('~/output/online_sinkhorn/big.pkl'))
+    results, parameters = joblib.load(expanduser('~/output/online_sinkhorn/smally.pkl'))
     ((x, f), (y, g), errorref) = results[-1]
     res = []
     for ((x, f), (y, g), errors), parameter in zip(results, parameters):
         errors['potential'] = [0 for _ in range(len(errors['ff']))]
         for i in range(len(errors['ff'])):
-            errors['potential'][i] = var_norm(errors['ff'][i] - errorref['ff'][-1]) + var_norm(errors['gg'][i] - errorref['gg'][-1])
+            errors['potential'][i] = var_norm(errors['ff'][i] - errorref['ff'][-1]) + var_norm(
+                errors['gg'][i] - errorref['gg'][-1])
             errors['w'][i] = abs(errors['w'][i] - errorref['w'][-1])
             if parameter['resample']:
                 index = f'online_{parameter["m"]}_{parameter["replacement"]}'
@@ -321,7 +383,8 @@ def plot_early_compute():
     for ((x, f), (y, g), errors), parameter in zip(results, parameters):
         errors['potential'] = [0 for _ in range(len(errors['ff']))]
         for i in range(len(errors['ff'])):
-            errors['potential'][i] = var_norm(errors['ff'][i] - errorref['ff'][-1]) + var_norm(errors['gg'][i] - errorref['gg'][-1])
+            errors['potential'][i] = var_norm(errors['ff'][i] - errorref['ff'][-1]) + var_norm(
+                errors['gg'][i] - errorref['gg'][-1])
             errors['w'][i] = abs(errors['w'][i] - errorref['w'][-1])
             if parameter['resample']:
                 index = f'online_{parameter["m"]}_{parameter["replacement"]}'
@@ -347,31 +410,36 @@ def plot_early_compute():
         res[f'{metric}_mean'] = np.exp(res[(metric, 'mean')])
 
     res = res.reset_index(['iter'])
-    fig, axes = plt.subplots(1, 2, figsize=(4, 1.8), constrained_layout=False)
-    fig.subplots_adjust(right=0.97, left=0.17, top=0.95, bottom=0.31, wspace=0.5)
+    fig, axes = plt.subplots(1, 2, figsize=(4, 2.4), constrained_layout=False)
+    fig.subplots_adjust(right=0.97, left=0.17, top=0.95, bottom=0.4, wspace=0.5)
     labels = {'0online_50_False': 'Online Sinkhorn (5\% sampling)',
               'online_100_False': 'Online Sinkhorn (10\% sampling)',
               'sinkhorn_1000_False': 'Sinkhorn'}
+    colors = sns.color_palette("Paired")
+    colors = {'0online_50_False': colors[5], 'online_100_False': colors[7], 'sinkhorn_1000_False': colors[3]}
     for ax, metric in zip(axes, ['potential', 'w']):
         for index, data in res.groupby('index'):
-            ax.plot(data['iter'], data[f"{metric}_mean"], label=labels[index])
+            ax.plot(data['iter'], data[f"{metric}_mean"], label=labels[index],
+                    linestyle='--' if 'sinkhorn' in index else '-',
+                    color=colors[index]
+                    )
             ax.fill_between(data['iter'], data[f"{metric}-std"], data[f"{metric}+std"],
                             alpha=0.2)
         ax.set_xscale('log')
         ax.set_yscale('log')
         ax.set_xticks([1e2, 1e4, 1e6, 1e8])
-        ax.set_xticklabels(['$1$', '$10^4$', '$C$ cost', '$10^8$'])
+        ax.set_xticklabels(['$1$', '$10^4$', 'Full $\\hat C$', '$10^8$'])
         ax.vlines([1e6], 1e-10, 1e3, color='0.3', linewidth=1)
-    axes[0].set_ylim([1e-1, 1e1])
+    axes[0].set_ylim([1e-2, 1e1])
     axes[0].set_ylabel(r'$||f_t,g_t - f^\star,g^\star||_{\textrm{var}}$')
-    axes[1].set_ylabel('$| \mathcal{W} - \mathcal{W}^\star |$')
-    axes[1].set_ylim([1e-2, 1])
-    axes[0].annotate('Computat°', xy=(0,0), xycoords="axes fraction", xytext=(-45, -7),
+    axes[1].set_ylabel('$| \mathcal{W}_t - \mathcal{W} |$')
+    axes[1].set_ylim([1e-6, 1])
+    axes[0].annotate('Computat°', xy=(0, 0), xycoords="axes fraction", xytext=(-45, -7),
                      textcoords="offset points", ha='left', va='top')
-    axes[0].legend(frameon=False, loc='upper left', bbox_to_anchor=(-0.3,-0.13), ncol=2, columnspacing=0.5,
-                   fontsize=8)
+    axes[0].legend(frameon=False, loc='upper left', bbox_to_anchor=(-0.5, -0.13), ncol=2, columnspacing=0.5,
+                   )
     sns.despine(fig)
-    plt.savefig('early_compute_low_eps.pdf')
+    plt.savefig('early_compute.pdf')
     plt.show()
 
 
@@ -381,14 +449,17 @@ def plot_comparison():
     res = []
     for ((x, f), (y, g), errors), parameter in zip(results, parameters):
         if parameter['m'] in [50, 1000]:
-            if parameter['ieta'] == 1 and parameter['eta'] == 1 and parameter['resample'] and not parameter['replacement']:
+            if parameter['ieta'] == 1 and parameter['eta'] == 1 and parameter['resample'] and not parameter[
+                'replacement']:
                 index = f'random{parameter["m"]}'
                 errors['computation'] = np.arange(len(errors['computation'])) * parameter["m"] ** 2
-            elif parameter['ieta'] == '1/sqrt(t)' and parameter['eta'] == '1/sqrt(t)' and parameter['resample'] and parameter['replacement']:
+            elif parameter['ieta'] == '1/sqrt(t)' and parameter['eta'] == '1/sqrt(t)' and parameter['resample'] and \
+                    parameter['replacement']:
                 index = f'avgonline{parameter["m"]}'
-            elif parameter['ieta'] == '1/sqrt(t)' and parameter['eta'] == 1 and parameter['resample'] and parameter['replacement']:
+            elif parameter['ieta'] == '1/sqrt(t)' and parameter['eta'] == 1 and parameter['resample'] and parameter[
+                'replacement']:
                 index = f'online{parameter["m"]}'
-            elif parameter['ieta'] == 1 and parameter['eta'] == '1/t' and parameter['resample']\
+            elif parameter['ieta'] == 1 and parameter['eta'] == '1/t' and parameter['resample'] \
                     and not parameter['replacement']:
                 index = f'avgrandom{parameter["m"]}'
                 errors['computation'] = np.arange(len(errors['computation'])) * parameter["m"] ** 2
@@ -400,7 +471,8 @@ def plot_comparison():
             continue
         errors['potential'] = [0 for _ in range(len(errors['ff']))]
         for i in range(len(errors['ff'])):
-            errors['potential'][i] = var_norm(errors['ff'][i] - errorref['ff'][-1]) + var_norm(errors['gg'][i] - errorref['gg'][-1])
+            errors['potential'][i] = var_norm(errors['ff'][i] - errorref['ff'][-1]) + var_norm(
+                errors['gg'][i] - errorref['gg'][-1])
             errors['w'][i] = abs(errors['w'][i] - errorref['w'][-1])
             if errors['computation'][i] == 1:
                 errors['computation'][i] = 100
@@ -419,8 +491,8 @@ def plot_comparison():
         res[f'{metric}_mean'] = np.exp(res[(metric, 'mean')])
 
     res = res.reset_index(['iter'])
-    fig, axes = plt.subplots(1, 2, figsize=(4, 2.2), constrained_layout=False)
-    fig.subplots_adjust(right=0.97, left=0.17, top=0.95, bottom=0.34, wspace=0.5)
+    fig, axes = plt.subplots(1, 2, figsize=(4, 2.4), constrained_layout=False)
+    fig.subplots_adjust(right=0.97, left=0.17, top=0.95, bottom=0.4, wspace=0.5)
     labels = {'sinkhorn1000': 'Sinkhorn', 'random50': 'Random Sinkhorn (5\%)',
               'online50': 'Online Sinkhorn (5\%)', 'sinkhorn50': 'Sinkhorn (5\%)',
               'avgrandom50': 'Avg random Sinkhorn  (5\%)',
@@ -430,11 +502,18 @@ def plot_comparison():
     linestyles = {'sinkhorn1000': '--', 'random50': '-',
                   'online50': '-', 'sinkhorn50': '--', 'avgrandom50': '-',
                   'avgonline50': '-'}
+    colors = sns.color_palette("Paired")
+    indices = ['avgonline50', 'online50', 'avgrandom50', 'random50', 'sinkhorn50', 'sinkhorn1000']
+    colors = {'sinkhorn1000': colors[3], 'sinkhorn50': colors[9], 'random50': colors[0], 'avgrandom50': colors[1],
+              'online50': colors[4], 'avgonline50': colors[5]}
     for ax, metric in zip(axes, ['potential', 'w']):
-        for index, data in res.groupby('index'):
-            ax.plot(data['iter'], data[f"{metric}_mean"], label=labels[index], zorder=zindexs[index],
+        for index in indices:
+            data = res.loc[index]
+            ax.plot(data['iter'], data[f"{metric}_mean"], label=labels[index],
+                    color=colors[index], zorder=zindexs[index],
                     linestyle=linestyles[index])
             ax.fill_between(data['iter'], data[f"{metric}-std"], data[f"{metric}+std"],
+                            color=colors[index],
                             alpha=0.2)
         ax.set_xscale('log')
         ax.set_yscale('log')
@@ -442,18 +521,62 @@ def plot_comparison():
     axes[0].set_ylabel(r'$||f_t,g_t - f^\star,g^\star||_{\textrm{var}}$')
     axes[1].set_ylabel('$| \mathcal{W}_t - \mathcal{W} |$')
     axes[1].set_ylim([1e-6, 1])
-    axes[0].annotate('Computat°', xy=(0,0), xycoords="axes fraction", xytext=(-45, -7),
+    axes[0].annotate('Computat°', xy=(0, 0), xycoords="axes fraction", xytext=(-45, -7),
                      textcoords="offset points", ha='left', va='top')
-    axes[0].legend(frameon=False, loc='upper left', bbox_to_anchor=(-0.3,-0.13), ncol=2, columnspacing=0.5,
-                   fontsize=8)
+    axes[0].legend(frameon=False, loc='upper left', bbox_to_anchor=(-0.55, -0.13), ncol=2, columnspacing=0.5,
+                   )
     sns.despine(fig)
     plt.savefig('comparison.pdf')
     plt.show()
 
+
+def simple2():
+    eps = 1
+
+    x = np.random.randn(20, 2)
+    y = np.random.randn(20, 2) + 10
+
+    x_sampler = Sampler(mean=torch.tensor([[1.], [2], [3]]), cov=torch.tensor([[[.1]], [[.1]], [[.1]]]),
+                        p=torch.ones(3) / 3)
+    y_sampler = Sampler(mean=torch.tensor([[0.], [3], [5]]), cov=torch.tensor([[[.1]], [[.1]], [[.4]]]),
+                        p=torch.ones(3) / 3)
+
+    x, loga = x_sampler(100)
+    y, logb = y_sampler(100)
+    x = x.numpy()
+    y = y.numpy()
+
+    mem = Memory(location=None)
+    _, _, errors = sinkhorn(x, y, eps=eps, n_iter=100)
+    fref = errors['ff'][-1]
+    gref = errors['gg'][-1]
+    _, _, errors = mem.cache(online_sinkhorn)(x, y, eps=eps,
+                                         fref=fref, gref=gref, samplingx=None, samplingy=None,
+                                         eta=1.,
+                                         ieta=1., n_iter=int(1e2),
+                                         resample=True,
+                                         replacement=True,
+                                         alternate=True)
+    ff = np.concatenate([f[None, :] for f in errors['ff']])
+    gg = np.concatenate([g[None, :] for g in errors['gg']])
+    diff = ff - fref[None, :]
+    var = diff.max(axis=1) - diff.min(axis=1)
+
+    fig, ax = plt.subplots(1, 1)
+    ax.plot(range(len(errors['lya'])), errors['lya'])
+    ax.set_yscale('log')
+    ax.set_title('lya')
+    plt.show()
+    fig, ax = plt.subplots(1, 1)
+    ax.plot(range(len(var)), var)
+    ax.set_yscale('log')
+    ax.set_title('var')
+    plt.show()
+
+
 if __name__ == '__main__':
-    # simple()
-    # main()
+    simple2()
     # plot()
-    plot_comparison()
-    plot_early_compute()
+    # plot_comparison()
+    # plot_early_compute()
     # one_dimensional_exp()
