@@ -225,6 +225,7 @@ def simple():
     fig.colorbar(cs)
     plt.show()
 
+
 class Sampler():
     def __init__(self, mean: torch.tensor, cov: torch.tensor, p: torch.tensor):
         k, d = mean.shape

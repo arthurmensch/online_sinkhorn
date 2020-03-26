@@ -32,7 +32,7 @@ class Sampler():
         self.norm = torch.sqrt((2 * math.pi) ** d * det)
         self.p = p
 
-    def _call(self, n):
+    def __call__(self, n):
         k, d = self.mean.shape
         indices = np.random.choice(k, n, p=self.p.numpy())
         pos = np.zeros((n, d), dtype=np.float32)
@@ -42,14 +42,6 @@ class Sampler():
             pos[mask] = np.random.multivariate_normal(self.mean[i], self.cov[i], size=size)
         logweight = np.full_like(pos[:, 0], fill_value=-math.log(n))
         return torch.from_numpy(pos), torch.from_numpy(logweight)
-
-    def __call__(self, n, fake=False):
-        if fake:
-            if not hasattr(self, 'pos_'):
-                self.pos_, self.logweight_ = self._call(n)
-            return self.pos_, self.logweight_
-        else:
-            return self._call(n)
 
     def log_prob(self, x):
         # b, d = x.shape
@@ -84,13 +76,6 @@ def sample_from_finite(x, m, random_state=None, full_after_one=False, replacemen
                 first_iter = False
 
 
-def sample_from(x, m):
-    n = x.shape[0]
-    indices = torch.from_numpy(np.random.permutation(n)[:m])
-    loga = torch.full((m,), fill_value=-math.log(m))
-    return x[indices], loga
-
-
 def var_norm(x):
     return x.max() - x.min()
 
@@ -108,7 +93,7 @@ def evaluate_potential_finite(log_pot: torch.tensor, idx: torch.tensor, distance
     return - eps * torch.logsumexp((- distance[idx] + log_pot[None, :]) / eps, dim=1)
 
 
-def online_sinkhorn(x, y, eps, fref, gref, n_iter=100, random_state=None, resample=True, ieta=1.,
+def online_sinkhorn(x, y, eps, n_iter=100, random_state=None, resample=True, ieta=1.,
                     samplingx=None, samplingy=None,
                     eta=1., alternate=False, replacement=True):
     random_state = check_random_state(random_state)
@@ -116,8 +101,6 @@ def online_sinkhorn(x, y, eps, fref, gref, n_iter=100, random_state=None, resamp
 
     x = torch.from_numpy(x)
     y = torch.from_numpy(y)
-    fref = torch.from_numpy(fref)
-    gref = torch.from_numpy(gref)
 
     n = x.shape[0]
     m = y.shape[0]
@@ -132,10 +115,13 @@ def online_sinkhorn(x, y, eps, fref, gref, n_iter=100, random_state=None, resamp
     u_eta = not isinstance(eta, float)
     u_ieta = not isinstance(ieta, float)
 
+    if samplingy is None:
+        if samplingx is not None:
+            samplingy = samplingx
+        else:
+            samplingy = y.shape[0]
     if samplingx is None:
         samplingx = x.shape[0]
-    if samplingy is None:
-        samplingy = y.shape[0]
 
     y_sampler = sample_from_finite(y, samplingy, random_state=random_state,
                                    replacement=replacement)
@@ -159,15 +145,9 @@ def online_sinkhorn(x, y, eps, fref, gref, n_iter=100, random_state=None, resamp
                                             eps)
             ff = (ff + fff) / 2
             gg = (gg + ggg) / 2
-            lya = (-ff.mean() - gg.mean() + fref.mean() + gref.mean()
-                   + eps * torch.logsumexp(((ff[:, None] + math.log(1 / m) * eps +
-                                             math.log(1 / n) * eps + gref[None, :] - distance) / eps).view(-1), dim=0)
-                   + eps * torch.logsumexp(((fref[:, None] + math.log(1 / m) * eps +
-                                             math.log(1 / n) * eps + gg[None, :] - distance) / eps).view(-1), dim=0))
             w = (ff.mean() + gg.mean())
             errors['ff'].append(ff.numpy())
             errors['gg'].append(gg.numpy())
-            errors['lya'].append(lya.numpy())
             errors['w'].append(w.item())
             errors['computation'].append(computations)
             errors['true_computation'].append(true_computations)
@@ -228,55 +208,6 @@ def online_sinkhorn(x, y, eps, fref, gref, n_iter=100, random_state=None, resamp
     return (y, avg_q), (x, avg_p), errors
 
 
-def rkhs(x, y, eps, m, n_iter=100, random_state=None, sigma=1e-1):
-    random_state = check_random_state(random_state)
-    torch.manual_seed(random_state.randint(100000))
-
-    x = torch.from_numpy(x)
-    y = torch.from_numpy(y)
-
-    n = x.shape[0]
-
-    posx = torch.zeros(m * n_iter, 1)
-    posy = torch.zeros(m * n_iter, 1)
-    q = torch.full((m * n_iter,), fill_value=-float('inf'))
-    p = torch.full((m * n_iter,), fill_value=-float('inf'))
-
-    posy = torch.zeros(m * n_iter, 1)
-
-    distance = compute_distance(x, y)
-    errors = defaultdict(list)
-
-    fevals = []
-    gevals = []
-    for i in range(0, n_iter):
-        eta = torch.tensor(i + 1.).pow(torch.tensor(-0.5))
-
-        # Update f
-        y_, logb = y_sampler(m)
-        x_, loga = x_sampler(m)
-        if i > 0:
-            f = evaluate_kernelw(p[:i * m], posx[:i * m], x_, sigma)
-            g = evaluate_kernelw(p[:i * m], posx[:i * m], y_, sigma)
-        else:
-            g = torch.zeros(m)
-        q[:i * m] += eps * torch.log(1 - eta)
-        q[i * m:(i + 1) * m] = eps * math.log(eta) + logb * eps + g
-        posy[i * m:(i + 1) * m] = y_
-
-        # Update g
-        f = evaluate_potential(q[:(i + 1) * m], posy[:(i + 1) * m], x_, eps)
-        p[:i * m] += eps * torch.log(1 - eta)
-        p[i * m:(i + 1) * m] = eps * math.log(eta) + loga * eps + f
-        posx[i * m:(i + 1) * m] = x_
-
-        if i % 10 == 0:
-            feval = evaluate_potential(q[:(i + 1) * m], posy[:(i + 1) * m], grid, eps)
-            geval = evaluate_potential(p[:(i + 1) * m], posx[:(i + 1) * m], grid, eps)
-            fevals.append(feval)
-            gevals.append(geval)
-
-
 def sinkhorn(x, y, eps, n_iter=1000, samplingx=None, samplingy=None):
     x = torch.from_numpy(x)
     y = torch.from_numpy(y)
@@ -305,7 +236,7 @@ def sinkhorn(x, y, eps, n_iter=1000, samplingx=None, samplingy=None):
     return (y, g + eps * logb), (x, f + eps * loga), errors
 
 
-def simple():
+def main():
     n = 1000
     eps = 1e-1
 
@@ -322,7 +253,7 @@ def simple():
     mem = Memory(location=expanduser('~/cache'))
     mem = Memory(location=None)
     parameters = ParameterGrid(
-        dict(m=[20, 50, 100], eta=['1/sqrt(t)', 1., '1/t'], ieta=['1/sqrt(t)', 1., '1/t'], resample=[True],
+        dict(samplingx=[20, 50, 100], eta=['1/sqrt(t)', 1., '1/t'], ieta=['1/sqrt(t)', 1., '1/t'], resample=[True],
              replacement=[True, False], random_state=[1]))
     baseline_parameters = ParameterGrid(dict(m=[50, 100, 1000], eta=[1.], ieta=[1.],
                                              resample=[False], alternate=[True], replacement=[False],
@@ -530,53 +461,8 @@ def plot_comparison():
     plt.show()
 
 
-def simple2():
-    eps = 1
-
-    x = np.random.randn(20, 2)
-    y = np.random.randn(20, 2) + 10
-
-    x_sampler = Sampler(mean=torch.tensor([[1.], [2], [3]]), cov=torch.tensor([[[.1]], [[.1]], [[.1]]]),
-                        p=torch.ones(3) / 3)
-    y_sampler = Sampler(mean=torch.tensor([[0.], [3], [5]]), cov=torch.tensor([[[.1]], [[.1]], [[.4]]]),
-                        p=torch.ones(3) / 3)
-
-    x, loga = x_sampler(2)
-    y, logb = y_sampler(2)
-    x = x.numpy()
-    y = y.numpy()
-
-    mem = Memory(location=None)
-    _, _, errors = sinkhorn(x, y, eps=eps, n_iter=100)
-    fref = errors['ff'][-1]
-    gref = errors['gg'][-1]
-    _, _, errors = mem.cache(online_sinkhorn)(x, y, eps=eps,
-                                              fref=fref, gref=gref, samplingx=None, samplingy=None,
-                                              eta=1.,
-                                              ieta=1., n_iter=int(1e3),
-                                              resample=True,
-                                              replacement=True,
-                                              alternate=True)
-    ff = np.concatenate([f[None, :] for f in errors['ff']])
-    gg = np.concatenate([g[None, :] for g in errors['gg']])
-    diff = ff - fref[None, :]
-    var = diff.max(axis=1) - diff.min(axis=1)
-
-    fig, ax = plt.subplots(1, 1)
-    ax.plot(range(len(errors['lya'])), errors['lya'])
-    ax.set_yscale('log')
-    ax.set_title('lya')
-    plt.show()
-    fig, ax = plt.subplots(1, 1)
-    ax.plot(range(len(var)), var)
-    ax.set_yscale('log')
-    ax.set_title('var')
-    plt.show()
-
-
 if __name__ == '__main__':
-    simple2()
+    main()
     # plot()
     # plot_comparison()
     # plot_early_compute()
-    # one_dimensional_exp()

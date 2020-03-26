@@ -7,7 +7,7 @@ import torch.nn as nn
 from torch.nn import Parameter
 from torch.optim import Adam, SGD
 
-from online import Sampler
+from old.online import Sampler
 
 
 def compute_distance(x, y):

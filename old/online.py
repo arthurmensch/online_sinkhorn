@@ -432,7 +432,7 @@ def sampling_sinkhorn(x_sampler, y_sampler, eps, m, grid, n_iter=100):
     return p, posx, q, posy, fevals, gevals
 
 
-def francis_sinkhorn(x_sampler, y_sampler, eps, m, grid, n_iter=1000, sigma=.1):
+def rkhs_sinkhorn(x_sampler, y_sampler, eps, m, grid, n_iter=1000, sigma=.1):
     posx = torch.zeros(m * n_iter, 1)
     alpha = torch.full((m * n_iter,), fill_value=0)
 
@@ -470,7 +470,7 @@ def evaluate_kernel(weights, pos, x, sigma):
     return torch.sum(weights[None, :] * C, dim=1)
 
 
-def one_dimensional_exp_francis():
+def one_dimensional_exp_rkhs():
     eps = 1e-1
 
     grid = torch.linspace(-4, 12, 500)[:, None]
@@ -517,7 +517,7 @@ def one_dimensional_exp_francis():
 
     m = 50
     sigma = 1
-    alpha, posx, posy, sto_fevals, sto_gevals = francis_sinkhorn(x_sampler, y_sampler, m=m, eps=eps,
+    alpha, posx, posy, sto_fevals, sto_gevals = rkhs_sinkhorn(x_sampler, y_sampler, m=m, eps=eps,
                                                                  n_iter=1000, sigma=sigma,
                                                                  grid=grid)
     feval = evaluate_kernel(alpha, posx, grid, sigma=sigma)
@@ -570,7 +570,7 @@ def one_dimensional_exp_francis():
     sns.despine(fig)
     for ax in [ax3, ax4]:
         ax.axis('off')
-    plt.savefig('continuous_francis.pdf')
+    plt.savefig('continuous_rkhs.pdf')
     plt.show()
 
 
@@ -798,4 +798,4 @@ if __name__ == '__main__':
     # main()
     # plot()
     # one_dimensional_exp()
-    one_dimensional_exp_francis()
+    one_dimensional_exp_rkhs()
