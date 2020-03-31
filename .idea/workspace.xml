@@ -2,35 +2,8 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="adf0c6cb-11cd-42ce-863c-8da01b12a349" name="Default Changelist" comment="">
-      <change afterPath="$PROJECT_DIR$/code/Readme.md" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/code/discrete_online_sinkhorn.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/code/simple_numpy.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/old/clean.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/old/online.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/online_sinkhorn/data.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/online_sinkhorn/potentials.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/online_sinkhorn/sequences.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/averaging.py" beforeDir="false" afterPath="$PROJECT_DIR$/old/averaging.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/coding.py" beforeDir="false" afterPath="$PROJECT_DIR$/old/coding.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/conf/config.yaml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/conf/db/mysql.yaml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/conf/db/postgresql.yaml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/exp.py" beforeDir="false" afterPath="$PROJECT_DIR$/old/exp.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/gw.py" beforeDir="false" afterPath="$PROJECT_DIR$/old/gw.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/hausdorff.py" beforeDir="false" afterPath="$PROJECT_DIR$/old/hausdorff.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/icml/online.py" beforeDir="false" afterPath="$PROJECT_DIR$/icml/online.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/icml/simple.py" beforeDir="false" afterPath="$PROJECT_DIR$/icml/simple.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/infinite.py" beforeDir="false" afterPath="$PROJECT_DIR$/old/infinite.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/mixture.py" beforeDir="false" afterPath="$PROJECT_DIR$/old/mixture.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/online.py" beforeDir="false" afterPath="$PROJECT_DIR$/code/online_sinkhorn.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/optimize.py" beforeDir="false" afterPath="$PROJECT_DIR$/old/optimize.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/recursion.py" beforeDir="false" afterPath="$PROJECT_DIR$/old/recursion.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/saddles.py" beforeDir="false" afterPath="$PROJECT_DIR$/old/saddles.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/test_jax.py" beforeDir="false" afterPath="$PROJECT_DIR$/old/test_jax.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/toy.py" beforeDir="false" afterPath="$PROJECT_DIR$/old/toy.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/tutorial/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/old/tutorial/__init__.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/unrolled.py" beforeDir="false" afterPath="$PROJECT_DIR$/old/unrolled.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/online_sinkhorn/potentials.py" beforeDir="false" afterPath="$PROJECT_DIR$/online_sinkhorn/potentials.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -89,7 +62,7 @@
       <recent name="$PROJECT_DIR$/icml" />
     </key>
   </component>
-  <component name="RunManager" selected="Python.sequences">
+  <component name="RunManager" selected="Python.potentials">
     <configuration name="clean" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
       <module name="online_sinkhorn" />
       <option name="INTERPRETER_OPTIONS" value="" />
@@ -254,8 +227,8 @@
     </list>
     <recent_temporary>
       <list>
-        <item itemvalue="Python.sequences" />
         <item itemvalue="Python.potentials" />
+        <item itemvalue="Python.sequences" />
         <item itemvalue="Python.discrete_online_sinkhorn" />
         <item itemvalue="Python.clean" />
         <item itemvalue="Python.online" />
@@ -305,7 +278,8 @@
     <MESSAGE value="Testing diaconis idea" />
     <MESSAGE value="WIP testing" />
     <MESSAGE value="WIP" />
-    <option name="LAST_COMMIT_MESSAGE" value="WIP" />
+    <MESSAGE value="Retake" />
+    <option name="LAST_COMMIT_MESSAGE" value="Retake" />
   </component>
   <component name="WindowStateProjectService">
     <state x="554" y="214" width="802" height="677" key="#Deployment" timestamp="1580654668103">
@@ -321,11 +295,11 @@
       <screen x="0" y="27" width="1920" height="1053" />
     </state>
     <state x="731" y="265" width="448" height="574" key="#com.jetbrains.python.refactoring.move.PyMoveModuleMembersDialog/0.27.1920.1053@0.27.1920.1053" timestamp="1581767339373" />
-    <state x="713" y="184" width="846" height="809" key="CommitChangelistDialog2" timestamp="1581051167978">
+    <state x="713" y="184" width="846" height="809" key="CommitChangelistDialog2" timestamp="1585212521755">
       <screen x="0" y="27" width="2560" height="1413" />
     </state>
     <state x="535" y="136" width="845" height="817" key="CommitChangelistDialog2/0.27.1920.1053@0.27.1920.1053" timestamp="1580915501228" />
-    <state x="713" y="184" width="846" height="809" key="CommitChangelistDialog2/0.27.2560.1413@0.27.2560.1413" timestamp="1581051167978" />
+    <state x="713" y="184" width="846" height="809" key="CommitChangelistDialog2/0.27.2560.1413@0.27.2560.1413" timestamp="1585212521755" />
     <state x="100" y="127" width="1720" height="853" key="DiffContextDialog" timestamp="1580919859409">
       <screen x="0" y="27" width="1920" height="1053" />
     </state>
@@ -335,30 +309,30 @@
     </state>
     <state x="727" y="295" width="455" height="515" key="FileChooserDialogImpl/0.27.1920.1053@0.27.1920.1053" timestamp="1580562650320" />
     <state x="969" y="387" width="426" height="514" key="FileChooserDialogImpl/0.27.2560.1413@0.27.2560.1413" timestamp="1581013481150" />
-    <state width="2512" height="284" key="GridCell.Tab.0.bottom" timestamp="1585159500112">
+    <state width="2512" height="284" key="GridCell.Tab.0.bottom" timestamp="1585660426525">
       <screen x="0" y="27" width="2560" height="1413" />
     </state>
     <state width="1872" height="408" key="GridCell.Tab.0.bottom/0.27.1920.1053@0.27.1920.1053" timestamp="1581892567823" />
     <state width="2512" height="486" key="GridCell.Tab.0.bottom/0.27.2560.1413/2560.0.3840.2160@0.27.2560.1413" timestamp="1580736316379" />
-    <state width="2512" height="284" key="GridCell.Tab.0.bottom/0.27.2560.1413@0.27.2560.1413" timestamp="1585159500112" />
-    <state width="2512" height="284" key="GridCell.Tab.0.center" timestamp="1585159500110">
+    <state width="2512" height="284" key="GridCell.Tab.0.bottom/0.27.2560.1413@0.27.2560.1413" timestamp="1585660426525" />
+    <state width="2512" height="284" key="GridCell.Tab.0.center" timestamp="1585660426524">
       <screen x="0" y="27" width="2560" height="1413" />
     </state>
     <state width="1872" height="408" key="GridCell.Tab.0.center/0.27.1920.1053@0.27.1920.1053" timestamp="1581892567822" />
     <state width="2512" height="486" key="GridCell.Tab.0.center/0.27.2560.1413/2560.0.3840.2160@0.27.2560.1413" timestamp="1580736316379" />
-    <state width="2512" height="284" key="GridCell.Tab.0.center/0.27.2560.1413@0.27.2560.1413" timestamp="1585159500110" />
-    <state width="2512" height="284" key="GridCell.Tab.0.left" timestamp="1585159500110">
+    <state width="2512" height="284" key="GridCell.Tab.0.center/0.27.2560.1413@0.27.2560.1413" timestamp="1585660426524" />
+    <state width="2512" height="284" key="GridCell.Tab.0.left" timestamp="1585660426524">
       <screen x="0" y="27" width="2560" height="1413" />
     </state>
     <state width="1872" height="408" key="GridCell.Tab.0.left/0.27.1920.1053@0.27.1920.1053" timestamp="1581892567821" />
     <state width="2512" height="486" key="GridCell.Tab.0.left/0.27.2560.1413/2560.0.3840.2160@0.27.2560.1413" timestamp="1580736316379" />
-    <state width="2512" height="284" key="GridCell.Tab.0.left/0.27.2560.1413@0.27.2560.1413" timestamp="1585159500110" />
-    <state width="2512" height="284" key="GridCell.Tab.0.right" timestamp="1585159500111">
+    <state width="2512" height="284" key="GridCell.Tab.0.left/0.27.2560.1413@0.27.2560.1413" timestamp="1585660426524" />
+    <state width="2512" height="284" key="GridCell.Tab.0.right" timestamp="1585660426525">
       <screen x="0" y="27" width="2560" height="1413" />
     </state>
     <state width="1872" height="408" key="GridCell.Tab.0.right/0.27.1920.1053@0.27.1920.1053" timestamp="1581892567823" />
     <state width="2512" height="486" key="GridCell.Tab.0.right/0.27.2560.1413/2560.0.3840.2160@0.27.2560.1413" timestamp="1580736316379" />
-    <state width="2512" height="284" key="GridCell.Tab.0.right/0.27.2560.1413@0.27.2560.1413" timestamp="1585159500111" />
+    <state width="2512" height="284" key="GridCell.Tab.0.right/0.27.2560.1413@0.27.2560.1413" timestamp="1585660426525" />
     <state width="2512" height="481" key="GridCell.Tab.1.bottom" timestamp="1585148090715">
       <screen x="0" y="27" width="2560" height="1413" />
     </state>
@@ -389,11 +363,11 @@
     </state>
     <state width="498" height="452" key="SwitcherDM/0.27.1920.1053@0.27.1920.1053" timestamp="1580646918432" />
     <state width="664" height="607" key="SwitcherDM/0.27.2560.1413@0.27.2560.1413" timestamp="1585152303572" />
-    <state x="874" y="468" width="802" height="528" key="Vcs.Push.Dialog.v2" timestamp="1581051169333">
+    <state x="874" y="468" width="802" height="528" key="Vcs.Push.Dialog.v2" timestamp="1585212523599">
       <screen x="0" y="27" width="2560" height="1413" />
     </state>
     <state x="656" y="348" width="802" height="528" key="Vcs.Push.Dialog.v2/0.27.1920.1053@0.27.1920.1053" timestamp="1580915504076" />
-    <state x="874" y="468" width="802" height="528" key="Vcs.Push.Dialog.v2/0.27.2560.1413@0.27.2560.1413" timestamp="1581051169333" />
+    <state x="874" y="468" width="802" height="528" key="Vcs.Push.Dialog.v2/0.27.2560.1413@0.27.2560.1413" timestamp="1585212523599" />
     <state width="960" height="527" key="XDebugger.FullValuePopup" timestamp="1581669729825">
       <screen x="0" y="27" width="1920" height="1053" />
     </state>
@@ -416,11 +390,11 @@
     </state>
     <state x="610" y="280" width="852" height="586" key="find.popup/0.27.1920.1053@0.27.1920.1053" timestamp="1581892091259" />
     <state x="813" y="366" width="934" height="733" key="find.popup/0.27.2560.1413@0.27.2560.1413" timestamp="1580824855615" />
-    <state width="600" height="424" key="javadoc.popup" timestamp="1585148099435">
+    <state width="600" height="424" key="javadoc.popup" timestamp="1585688768446">
       <screen x="0" y="27" width="2560" height="1413" />
     </state>
     <state width="450" height="316" key="javadoc.popup/0.27.1920.1053@0.27.1920.1053" timestamp="1581781277064" />
-    <state width="600" height="424" key="javadoc.popup/0.27.2560.1413@0.27.2560.1413" timestamp="1585148099435" />
+    <state width="600" height="424" key="javadoc.popup/0.27.2560.1413@0.27.2560.1413" timestamp="1585688768446" />
     <state x="705" y="425" width="714" height="303" key="org.intellij.images.editor.actions.BackgroundImageDialog" timestamp="1580562633470">
       <screen x="0" y="27" width="1920" height="1053" />
     </state>
@@ -526,12 +500,12 @@
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/online_sinkhorn/potentials.py</url>
-          <line>115</line>
+          <line>216</line>
           <option name="timeStamp" value="38" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/online_sinkhorn/potentials.py</url>
-          <line>171</line>
+          <line>272</line>
           <option name="timeStamp" value="41" />
         </line-breakpoint>
       </breakpoints>
@@ -564,7 +538,7 @@
     <SUITE FILE_PATH="coverage/online_sinkhorn$averaging.coverage" NAME="averaging Coverage Results" MODIFIED="1580894950205" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/online_sinkhorn$exp.coverage" NAME="exp Coverage Results" MODIFIED="1576762123637" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/online_sinkhorn$gw.coverage" NAME="gw Coverage Results" MODIFIED="1574595020683" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
-    <SUITE FILE_PATH="coverage/online_sinkhorn$potentials.coverage" NAME="potentials Coverage Results" MODIFIED="1585157448202" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/online_sinkhorn" />
+    <SUITE FILE_PATH="coverage/online_sinkhorn$potentials.coverage" NAME="potentials Coverage Results" MODIFIED="1585660339486" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/online_sinkhorn" />
     <SUITE FILE_PATH="coverage/online_sinkhorn$discrete_online_sinkhorn.coverage" NAME="discrete_online_sinkhorn Coverage Results" MODIFIED="1581892557517" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/code" />
     <SUITE FILE_PATH="coverage/online_sinkhorn$unrolled.coverage" NAME="unrolled Coverage Results" MODIFIED="1571235341496" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/online_sinkhorn$clean.coverage" NAME="clean Coverage Results" MODIFIED="1581797958957" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
