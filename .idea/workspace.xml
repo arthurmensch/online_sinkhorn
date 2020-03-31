@@ -277,9 +277,9 @@
     <MESSAGE value="WIP averaging dual - primal" />
     <MESSAGE value="Testing diaconis idea" />
     <MESSAGE value="WIP testing" />
-    <MESSAGE value="WIP" />
     <MESSAGE value="Retake" />
-    <option name="LAST_COMMIT_MESSAGE" value="Retake" />
+    <MESSAGE value="WIP" />
+    <option name="LAST_COMMIT_MESSAGE" value="WIP" />
   </component>
   <component name="WindowStateProjectService">
     <state x="554" y="214" width="802" height="677" key="#Deployment" timestamp="1580654668103">
@@ -295,11 +295,11 @@
       <screen x="0" y="27" width="1920" height="1053" />
     </state>
     <state x="731" y="265" width="448" height="574" key="#com.jetbrains.python.refactoring.move.PyMoveModuleMembersDialog/0.27.1920.1053@0.27.1920.1053" timestamp="1581767339373" />
-    <state x="713" y="184" width="846" height="809" key="CommitChangelistDialog2" timestamp="1585689282329">
+    <state x="713" y="184" width="846" height="809" key="CommitChangelistDialog2" timestamp="1585689285524">
       <screen x="0" y="27" width="2560" height="1413" />
     </state>
     <state x="535" y="136" width="845" height="817" key="CommitChangelistDialog2/0.27.1920.1053@0.27.1920.1053" timestamp="1580915501228" />
-    <state x="713" y="184" width="846" height="809" key="CommitChangelistDialog2/0.27.2560.1413@0.27.2560.1413" timestamp="1585689282329" />
+    <state x="713" y="184" width="846" height="809" key="CommitChangelistDialog2/0.27.2560.1413@0.27.2560.1413" timestamp="1585689285524" />
     <state x="100" y="127" width="1720" height="853" key="DiffContextDialog" timestamp="1580919859409">
       <screen x="0" y="27" width="1920" height="1053" />
     </state>
@@ -390,11 +390,11 @@
     </state>
     <state x="610" y="280" width="852" height="586" key="find.popup/0.27.1920.1053@0.27.1920.1053" timestamp="1581892091259" />
     <state x="813" y="366" width="934" height="733" key="find.popup/0.27.2560.1413@0.27.2560.1413" timestamp="1580824855615" />
-    <state width="600" height="424" key="javadoc.popup" timestamp="1585688768446">
+    <state width="600" height="424" key="javadoc.popup" timestamp="1585689500472">
       <screen x="0" y="27" width="2560" height="1413" />
     </state>
     <state width="450" height="316" key="javadoc.popup/0.27.1920.1053@0.27.1920.1053" timestamp="1581781277064" />
-    <state width="600" height="424" key="javadoc.popup/0.27.2560.1413@0.27.2560.1413" timestamp="1585688768446" />
+    <state width="600" height="424" key="javadoc.popup/0.27.2560.1413@0.27.2560.1413" timestamp="1585689500472" />
     <state x="705" y="425" width="714" height="303" key="org.intellij.images.editor.actions.BackgroundImageDialog" timestamp="1580562633470">
       <screen x="0" y="27" width="1920" height="1053" />
     </state>
@@ -500,12 +500,12 @@
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/online_sinkhorn/potentials.py</url>
-          <line>216</line>
+          <line>253</line>
           <option name="timeStamp" value="38" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/online_sinkhorn/potentials.py</url>
-          <line>272</line>
+          <line>309</line>
           <option name="timeStamp" value="41" />
         </line-breakpoint>
       </breakpoints>
