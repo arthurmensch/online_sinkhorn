@@ -51,6 +51,7 @@ class OT:
                 else:
                     # noinspection PyUnresolvedReferences
                     f = - logsumexp(self.q[:, :self.y_cursor] - distance, axis=1, keepdims=True)
+                    print(f)
             else:
                 f = None
         else:
@@ -85,15 +86,23 @@ class OT:
             if full:
                 self.p[:new_x_cursor, :] = f - np.log(new_x_cursor)
             else:
-                self.p[:self.x_cursor, :] += np.log(1 - step_size)
-                self.p[self.x_cursor:new_x_cursor, :] += np.log(step_size) + f - np.log(n)
+                if step_size == 1.:
+                    self.p[:self.x_cursor, :] = - float('inf')
+                    self.p[self.x_cursor:new_x_cursor, :] += f - np.log(n)
+                else:
+                    self.p[:self.x_cursor, :] += np.log(1 - step_size)
+                    self.p[self.x_cursor:new_x_cursor, :] += np.log(step_size) + f - np.log(n)
                 self.x_cursor = new_x_cursor
         if g is not None:
             if full:
                 self.q[:, :new_y_cursor] = g - np.log(new_y_cursor)
             else:
-                self.q[:, self.y_cursor] += np.log(1 - step_size)
-                self.q[:, self.y_cursor:new_y_cursor] += np.log(step_size) + g - np.log(m)
+                if step_size == 1.:
+                    self.q[:, self.y_cursor] = - float('inf')
+                    self.q[:, self.y_cursor:new_y_cursor] += g - np.log(m)
+                else:
+                    self.q[:, self.y_cursor] += np.log(1 - step_size)
+                    self.q[:, self.y_cursor:new_y_cursor] += np.log(step_size) + g - np.log(m)
                 self.y_cursor = new_y_cursor
 
     def evaluate(self, *, x=None, y=None):
@@ -111,9 +120,11 @@ class OT:
             raise ValueError
 
     def scale(self, *, scale_x=True, scale_y=True):
+        if self.x_cursor == 0 or self.y_cursor == 0:
+            return
         if scale_x:
             # noinspection PyUnresolvedReferences
-            # shape (x_idx, 1)
+            # shape (:self.x_cursor, 1)
             f = - logsumexp(self.q[:, :self.y_cursor]
                             - self.distance[:self.x_cursor, :self.y_cursor],
                             axis=1, keepdims=True)
@@ -129,9 +140,9 @@ class OT:
             g = None
 
         if scale_x:
-            self.p[:self.x_cursor] = f - np.log(self.x_cursor)
+            self.p[:self.x_cursor, :] = f - np.log(self.x_cursor)
         if scale_y:
-            self.q[:self.y_cursor] = g - np.log(self.y_cursor)
+            self.q[:, :self.y_cursor] = g - np.log(self.y_cursor)
 
     def compute_distance(self):
         distance = self.distance[:self.x_cursor, :self.y_cursor]
@@ -142,8 +153,8 @@ class OT:
         return f.mean() + g.mean()
 
     def online_sinkhorn(self, x_sampler, y_sampler, A=1., B=1, a=0., b=1):
-        iter = 0
-        while self.x_cursor <= self.max_size or self.y_cursor <= self.max_size:
+        iter = 1
+        while self.x_cursor < self.max_size or self.y_cursor < self.max_size:
             if a != 0:
                 step_size = A * np.float_power(iter, - a)
             else:
@@ -156,7 +167,8 @@ class OT:
             y, logb = y_sampler(batch_size)
             self.enrich(x=x, y=y, step_size=step_size)
             print('enrich')
-            if iter % 10:
+            print(self.x_cursor, self.y_cursor)
+            if iter % 10 == 0:
                 print('scale')
                 self.scale(scale_x=True, scale_y=True)
             iter += 1
