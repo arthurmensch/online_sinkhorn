@@ -1,4 +1,3 @@
-import math
 from os.path import expanduser
 from queue import Full
 
@@ -44,8 +43,14 @@ class OT:
                 self.distance[self.x_cursor:new_x_cursor, :self.y_cursor] = distance
                 if full:
                     distance = self.distance[:new_x_cursor, :self.y_cursor]
-                # noinspection PyUnresolvedReferences
-                f = - logsumexp(self.q[:, :self.y_cursor] - distance, axis=1, keepdims=True)
+                if self.y_cursor == 0:
+                    if full:
+                        f = np.zeros((1, new_x_cursor))
+                    else:
+                        f = np.zeros((1, n))
+                else:
+                    # noinspection PyUnresolvedReferences
+                    f = - logsumexp(self.q[:, :self.y_cursor] - distance, axis=1, keepdims=True)
             else:
                 f = None
         else:
@@ -62,8 +67,14 @@ class OT:
                 self.distance[:self.x_cursor, self.y_cursor:new_y_cursor] = distance
                 if full:
                     distance = self.distance[:self.x_cursor, :new_y_cursor]
-                # noinspection PyUnresolvedReferences
-                g = - logsumexp(self.p[:self.x_cursor, :] - distance, axis=0, keepdims=True)
+                if self.x_cursor == 0:
+                    if full:
+                        g = np.zeros((new_y_cursor, 1))
+                    else:
+                        g = np.zeros((m, 1))
+                else:
+                    # noinspection PyUnresolvedReferences
+                    g = - logsumexp(self.p[:self.x_cursor, :] - distance, axis=0, keepdims=True)
             else:
                 g = None
         else:
@@ -72,17 +83,17 @@ class OT:
             m = None
         if f is not None:
             if full:
-                self.p[:new_x_cursor, :] = f - math.log(new_x_cursor)
+                self.p[:new_x_cursor, :] = f - np.log(new_x_cursor)
             else:
-                self.p[:self.x_cursor, :] += math.log(1 - step_size)
-                self.p[self.x_cursor:new_x_cursor, :] += math.log(step_size) + f - math.log(n)
+                self.p[:self.x_cursor, :] += np.log(1 - step_size)
+                self.p[self.x_cursor:new_x_cursor, :] += np.log(step_size) + f - np.log(n)
                 self.x_cursor = new_x_cursor
         if g is not None:
             if full:
-                self.q[:, :new_y_cursor] = g - math.log(new_y_cursor)
+                self.q[:, :new_y_cursor] = g - np.log(new_y_cursor)
             else:
-                self.q[:, self.y_cursor] += math.log(1 - step_size)
-                self.q[:, self.y_cursor:new_y_cursor] += math.log(step_size) + g - math.log(m)
+                self.q[:, self.y_cursor] += np.log(1 - step_size)
+                self.q[:, self.y_cursor:new_y_cursor] += np.log(step_size) + g - np.log(m)
                 self.y_cursor = new_y_cursor
 
     def evaluate(self, *, x=None, y=None):
@@ -118,9 +129,9 @@ class OT:
             g = None
 
         if scale_x:
-            self.p[:self.x_cursor] = f - math.log(self.x_cursor)
+            self.p[:self.x_cursor] = f - np.log(self.x_cursor)
         if scale_y:
-            self.q[:self.y_cursor] = g - math.log(self.y_cursor)
+            self.q[:self.y_cursor] = g - np.log(self.y_cursor)
 
     def compute_distance(self):
         distance = self.distance[:self.x_cursor, :self.y_cursor]
@@ -144,7 +155,9 @@ class OT:
             x, loga = x_sampler(batch_size)
             y, logb = y_sampler(batch_size)
             self.enrich(x=x, y=y, step_size=step_size)
+            print('enrich')
             if iter % 10:
+                print('scale')
                 self.scale(scale_x=True, scale_y=True)
             iter += 1
 
@@ -184,17 +197,17 @@ class Potential:
             if new_cursor > self.max_size:
                 raise Full
 
-            self.coefs[self.cursor:new_cursor] = new_weights + new_potentials + math.log(step_size)
+            self.coefs[self.cursor:new_cursor] = new_weights + new_potentials + np.log(step_size)
             self.positions[self.cursor:new_cursor] = new_positions
-            self.coefs[:self.cursor] += math.log(1 - step_size)
+            self.coefs[:self.cursor] += np.log(1 - step_size)
         else:
             new_cursor = len(new_positions)
             if new_cursor > self.max_size:
                 raise Full
             self.coefs[:new_cursor] = new_weights[:new_cursor] + new_potentials[:new_cursor]
             self.positions[:new_cursor] = new_positions[:new_cursor]
-        self.avg_coefs[:self.cursor] = np.logaddexp(self.avg_coefs[:self.cursor] + math.log(1 - self.iter),
-                                                    self.coefs[:self.cursor] + math.log(self.iter))
+        self.avg_coefs[:self.cursor] = np.logaddexp(self.avg_coefs[:self.cursor] + np.log(1 - self.iter),
+                                                    self.coefs[:self.cursor] + np.log(self.iter))
         self.cursor = new_cursor
 
 
@@ -270,8 +283,17 @@ def online_sinkhorn(x_sampler, y_sampler, A=1., B=10, a=0., b=1., max_size=1000,
 def var_norm(x):
     return np.max(x) - np.min(x)
 
-def main2():
+def run_OT():
+    np.random.seed(0)
 
+    n = 1000
+
+    x_sampler = Sampler(mean=np.array([[1.], [2], [3]]), cov=np.array([[[.1]], [[.1]], [[.1]]]),
+                        p=np.ones(3) / 3)
+    y_sampler = Sampler(mean=np.array([[0.], [3], [5]]), cov=np.array([[[.1]], [[.1]], [[.4]]]),
+                        p=np.ones(3) / 3)
+    ot = OT(max_size=10000, dimension=1)
+    ot.online_sinkhorn(x_sampler, y_sampler)
 
 def main():
     np.random.seed(0)
@@ -334,4 +356,5 @@ def plot():
 
 if __name__ == '__main__':
     # main()
-    plot()
+    # plot()
+    run_OT()
