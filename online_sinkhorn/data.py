@@ -3,12 +3,20 @@ import numpy as np
 
 class Subsampler:
     def __init__(self, x):
-        self.x = x
+        self.x = np.array(x, copy=True)
         self.dim = x.shape[1]
+        self.cursor = 0
 
     def __call__(self, n):
-        n = min(n, len(self.x))
-        return self.x[np.random.permutation(len(self.x))[:n]], np.full((n, ), fill_value=-np.log(n))
+        new_cursor = min(len(self.x), self.cursor + n)
+        x = np.array(self.x[self.cursor:new_cursor], copy=True)
+        if new_cursor == len(self.x):
+            np.random.shuffle(self.x)
+            self.cursor = (self.cursor + n) % len(self.x)
+            x = np.concatenate([x, self.x[:self.cursor]], axis=0)
+        else:
+            self.cursor = new_cursor
+        return x, np.full((n, ), fill_value=-np.log(n))
 
 
 class Sampler:
