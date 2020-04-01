@@ -311,7 +311,7 @@ def var_norm(x):
 def run_OT():
     np.random.seed(0)
 
-    n = 1000
+    n = 100
 
     yref = np.random.randn(n, 1)
     xref = np.random.randn(n, 1) + 10
@@ -319,10 +319,10 @@ def run_OT():
     x_sampler = Subsampler(xref)
     y_sampler = Subsampler(yref)
 
-    ot = OT(max_size=1000, dimension=1)
-    ot.online_sinkhorn(x_sampler, y_sampler, B=10, full=True)
+    ot = OT(max_size=100, dimension=1)
+    ot.online_sinkhorn(x_sampler, y_sampler, B=10, full=False)
     print('ref')
-    ot = OT(max_size=1000, dimension=1)
+    ot = OT(max_size=100, dimension=1)
     ot.sinkhorn(xref, yref, 100)
 
 def main():
