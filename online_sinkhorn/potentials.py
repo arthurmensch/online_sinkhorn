@@ -95,15 +95,21 @@ class OT:
             new_y_cursor = self.y_cursor
             m = None
         if x is not None and y is not None:
-            self.distance[self.x_cursor:new_x_cursor, self.y_cursor:new_y_cursor] = compute_distance(x, y)
+            if step_size == 1:
+                new_x_cursor = n
+                new_y_cursor = m
+                self.distance[:new_x_cursor, :new_y_cursor] = compute_distance(x, y)
+            else:
+                self.distance[self.x_cursor:new_x_cursor, self.y_cursor:new_y_cursor] = compute_distance(x, y)
             self.computations += n * m
         if f is not None:
             if full:
                 self.p[:new_x_cursor, :] = f - np.log(new_x_cursor)
             else:
                 if step_size == 1.:
-                    self.p[:self.x_cursor, :] = - float('inf')
-                    self.p[self.x_cursor:new_x_cursor, :] = f - np.log(n)
+                    new_x_cursor = n
+                    self.p[:new_x_cursor, :] = f - np.log(n)
+                    self.x[:new_x_cursor] = x
                 else:
                     self.p[:self.x_cursor, :] += np.log(1 - step_size)
                     self.p[self.x_cursor:new_x_cursor, :] = np.log(step_size) + f - np.log(n)
@@ -119,8 +125,9 @@ class OT:
                 self.q[:, :new_y_cursor] = g - np.log(new_y_cursor)
             else:
                 if step_size == 1.:
-                    self.q[:, :self.y_cursor] = - float('inf')
-                    self.q[:, self.y_cursor:new_y_cursor] = g - np.log(m)
+                    new_y_cursor = m
+                    self.q[:, :new_y_cursor] = g - np.log(m)
+                    self.y[:new_y_cursor] = y
                 else:
                     self.q[:, :self.y_cursor] += np.log(1 - step_size)
                     self.q[:, self.y_cursor:new_y_cursor] = np.log(step_size) + g - np.log(m)
@@ -227,13 +234,13 @@ def online_sinkhorn(x_sampler, y_sampler, A=1., B=10, a=1 / 2, b=1 / 2, full=Fal
                               iter=n_iter,
                               var_err=var_err, w_err=w_err, n_iter=n_iter))
 
-    # growing = (a > 0. or b > 0. or full)
-    # if not growing:
-    #     assert max_iter is not None
-    # if max_iter is None:
-    #     max_iter = float('inf')
+    growing = (a > 0. or b > 0. or full)
+    if not growing:
+        assert max_iter is not None
+    if max_iter is None:
+        max_iter = float('inf')
 
-    while not ot.full:
+    while (growing and not ot.full) or (not growing and n_iter < max_iter):
         if a != 0:
             step_size = A / np.float_power(n_iter, a)
         else:
@@ -308,10 +315,7 @@ def run_OT():
                # dict(a=0.2, b=0., B=n, A=1, full=False, max_size=n * 100, n_scale_iter=0, name="Sinkhorn 0.2"),
                # dict(a=0.8, b=0., B=n, A=1, full=False, max_size=n * 100, n_scale_iter=0, name="Sinkhorn 0.8"),
                dict(a=0.0, b=0., B=10, A=1, full=False, max_size=2 * n, max_iter=100, n_scale_iter=0, name="Randomized Sinkhorn"),
-               dict(a=0.0, b=0., B=n, A=1, full=False, max_size=2 * n, max_iter=100, n_scale_iter=0, name="Full Randomized Sinkhorn"),
-               # dict(a=0.5, b=0., B=10, A=1, full=False, max_size=10 * n, n_scale_iter=0, name="Online Sinkhorn"),
-               # dict(a=0.0, b=0., B=10, A=1, full=True, max_size=10 * n, max_iter=100, n_scale_iter=0, name="Growing Sinkhorn"),
-               # dict(a=0.0, b=0., B=n, A=1, full=True, max_size=n, max_iter=100, n_scale_iter=100, name="Sinkhorn"),
+               dict(a=0.0, b=0., B=50, A=1, full=False, max_size=2 * n, max_iter=100, n_scale_iter=0, name="Full Randomized Sinkhorn"),
                # dict(a=0.0, b=0., B=n, A=1, full=False, max_size=n, n_scale_iter=100, full_a=0.0, full_A=1.,
                #      name="Sinkhorn 0.0 (fast)"),
                # dict(a=0.0, b=0., B=n, A=1, full=False, max_size=n, n_scale_iter=100, full_a=0.01, full_A=1.,
