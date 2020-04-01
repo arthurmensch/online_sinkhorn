@@ -132,7 +132,8 @@ class OT:
                                                                     self.q[:, :new_y_cursor] + math.log(avg_step_size))
             self.y_cursor = new_y_cursor
 
-    def refit(self, *, refit_f=True, refit_g=True):
+    def refit(self, *, refit_f=True, refit_g=True, step_size=1.):
+        self.computations += self.x_cursor * self.y_cursor
         if self.x_cursor == 0 or self.y_cursor == 0:
             return
         if refit_f:
@@ -153,15 +154,23 @@ class OT:
             g = None
 
         if refit_f:
-            self.p[:self.x_cursor, :] = f - np.log(self.x_cursor)
+            if step_size == 1:
+                self.p[:self.x_cursor, :] = f - np.log(self.x_cursor)
+            else:
+                self.p[:self.x_cursor, :] = np.logaddexp(f - np.log(self.x_cursor) + np.log(step_size),
+                                                         self.p[:self.x_cursor] + np.log(1 - step_size))
         if refit_g:
-            self.q[:, :self.y_cursor] = g - np.log(self.y_cursor)
+            if step_size == 1:
+                self.q[:, :self.y_cursor] = g - np.log(self.y_cursor)
+            else:
+                self.q[:self.x_cursor, :] = np.logaddexp(g - np.log(self.x_cursor) + np.log(step_size),
+                                                         self.q[:self.x_cursor] + np.log(1 - step_size))
 
     def compute_ot(self):
         if self.averaging:
             q, p = self.avg_q, self.avg_p
         else:
-            q, p  =self.q, self.p
+            q, p = self.q, self.p
         distance = self.distance[:self.x_cursor, :self.y_cursor]
         f = - logsumexp(q[:, :self.y_cursor] - distance, axis=1, keepdims=True)
         g = - logsumexp(p[:self.x_cursor] - distance, axis=0, keepdims=True)
@@ -201,26 +210,17 @@ class OT:
 def online_sinkhorn(x_sampler, y_sampler, A=1., B=10, a=1 / 2, b=1 / 2, full=False, max_size=1000, n_scale_iter=0,
                     averaging=False, ref=None, name=None):
     ot = OT(max_size=max_size, dimension=x_sampler.dim, averaging=averaging)
-    n_iter = 1
+    n_iter = 1.
 
     if ref is not None:
         trace = []
 
-    def eval():
-        if ref is not None:
-            f, g = ot.evaluate_potential(x=ref['x'], y=ref['y'])
-            w = ot.compute_ot()
-            var_err = var_norm(f - ref['f']) + var_norm(g - ref['g'])
-            w_err = np.abs(w - ref['w'])
-            trace.append(dict(computations=ot.computations, samples=ot.x_cursor + ot.y_cursor,
-                              var_err=var_err, w_err=w_err))
-
     while not ot.full:
         if a != 0:
-            step_size = A * np.float_power(n_iter, - a)
+            step_size = A * 11 / (10 + np.float_power(n_iter, a))
         else:
             step_size = A
-        avg_step_size = 1 / n_iter
+        avg_step_size = 1. / n_iter
         if b != 0:
             batch_size = np.ceil(B * np.float_power(n_iter, b * 2)).astype(int)
         else:
@@ -229,12 +229,28 @@ def online_sinkhorn(x_sampler, y_sampler, A=1., B=10, a=1 / 2, b=1 / 2, full=Fal
         x, loga = x_sampler(batch_size)
         y, logb = y_sampler(batch_size)
         ot.partial_fit(x=x, y=y, step_size=step_size, full=full, avg_step_size=avg_step_size)
-        eval()
+        if ref is not None:
+            f, g = ot.evaluate_potential(x=ref['x'], y=ref['y'])
+            w = ot.compute_ot()
+            var_err = var_norm(f - ref['f']) + var_norm(g - ref['g'])
+            w_err = np.abs(w - ref['w'])
+            trace.append(dict(computations=ot.computations, samples=ot.x_cursor + ot.y_cursor,
+                              iter=n_iter,
+                              var_err=var_err, w_err=w_err, n_iter=n_iter))
         n_iter += 1
 
     for i in range(n_scale_iter):
-        ot.refit(refit_f=True, refit_g=True)
-        eval()
+        ot.refit(refit_f=True, refit_g=True, step_size=A)
+        if ref is not None:
+            f, g = ot.evaluate_potential(x=ref['x'], y=ref['y'])
+            w = ot.compute_ot()
+            var_err = var_norm(f - ref['f']) + var_norm(g - ref['g'])
+            w_err = np.abs(w - ref['w'])
+            trace.append(dict(computations=ot.computations, samples=ot.x_cursor + ot.y_cursor,
+                              iter=n_iter,
+                              var_err=var_err, w_err=w_err, n_iter=n_iter))
+        n_iter += 1
+
 
     if trace is not None:
         return ot, trace
@@ -247,7 +263,6 @@ def sinkhorn(x, y, n_iter=100):
     ot.partial_fit(x=x, y=y, step_size=1.)  # Fill the cost matrix
     # print('sinkhorn', self.distance)
     for i in range(n_iter):
-        print(f'Iter {i}')
         ot.refit(refit_f=True, refit_g=True)
         w = ot.compute_ot()
     f, g = ot.evaluate_potential(x=x, y=y)
@@ -261,13 +276,13 @@ def var_norm(x):
 def run_OT():
     np.random.seed(0)
 
-    n = 20
+    n = 100
     n_ref_iter = 100
 
     x = np.random.randn(n, 5)
     y = np.random.randn(n, 5) + 10
 
-    mem = Memory(location=expanduser('~/cache'))
+    mem = Memory(location=None)
 
     (f, g), w = mem.cache(sinkhorn)(x, y, n_ref_iter)
     ref = dict(f=f, g=g, x=x, y=y, w=w)
@@ -275,10 +290,15 @@ def run_OT():
     x_sampler = Subsampler(x)
     y_sampler = Subsampler(y)
     n_scale_iter = 0
-    max_size = n * 100
-    configs = [dict(a=0., b=0., B=n, A=1, full=False, max_size=n * 100, n_scale_iter=0, name="Sinkhorn"),
-               dict(a=1., b=0., B=n, A=1, full=False, max_size=n * 100, n_scale_iter=0, name="Sinkhorn slowed"),]
-               # dict(a=0., b=0., B=10, A=1, full=False, max_size=10, n_scale_iter=n_ref_iter, name="Partial Sinkhorn"),
+    max_size = n * 10
+    configs = [
+               # dict(a=0.0, b=0., B=n, A=1., full=False, max_size=n * 100, n_scale_iter=0, name="Sinkhorn slowed"),
+               # dict(a=0.0, b=0., B=n, A=1, full=False, max_size=n * 100, n_scale_iter=0, name="Sinkhorn slowed 0.9"),
+               dict(a=0.0, b=0., B=n, A=1, full=False, max_size=n, n_scale_iter=n_ref_iter, name="Sinkhorn"),
+               # dict(a=0.0, b=0., B=n, A=.5, full=False, max_size=n * 100, n_scale_iter=0, name="Sinkhorn slowed 0.5"),
+               # dict(a=0.0, b=0., B=n, A=.5, full=False, max_size=n, n_scale_iter=1000, name="Sinkhorn 0.5"),
+               # ]
+               dict(a=0., b=0., B=10, A=1, full=False, max_size=10, n_scale_iter=n_ref_iter, name="Partial Sinkhorn"),
                # dict(a=0., b=0., B=10, A=1, full=False, max_size=max_size, n_scale_iter=n_scale_iter,
                #      name="Randomized Sinkhorn"),
                # dict(a=0., b=1., B=10, A=1, full=False, max_size=max_size, n_scale_iter=n_scale_iter,
@@ -286,8 +306,8 @@ def run_OT():
                # dict(a=0., b=0., B=10, A=1, full=False, max_size=max_size, n_scale_iter=n_scale_iter,
                #      averaging=True,
                #      name="Randomized Sinkhorn + averaging"),
-               # dict(a=0., b=1., B=10, A=1, full=True, max_size=max_size, n_scale_iter=n_scale_iter,
-               #      name="Full-refit randomized Sinkhorn"),
+               dict(a=0., b=1., B=10, A=1, full=True, max_size=max_size, n_scale_iter=n_scale_iter,
+                    name="Full-refit randomized Sinkhorn"),
                # dict(a=1., b=0.1, B=10, A=1, full=False, max_size=max_size, n_scale_iter=n_scale_iter,
                #      name="Online Sinkhorn 1/n"),
                # dict(a=1. / 2, b=1/2, B=10, A=1, full=False, max_size=max_size, n_scale_iter=n_scale_iter,
@@ -295,7 +315,8 @@ def run_OT():
                # dict(a=1. / 2, b=1/2, B=10, A=1, full=False, max_size=max_size, n_scale_iter=n_scale_iter,
                #      name="Online Sinkhorn 1/sqrt(n) + averaging", averaging=True),
                # dict(a=1. / 2, b=1 / 2, B=10, A=1, full=True, max_size=max_size, n_scale_iter=n_scale_iter,
-               #      name="Online full-refit Sinkhorn")]
+               #      name="Online full-refit Sinkhorn")
+                         ]
 
     traces = Parallel(n_jobs=5)(delayed(mem.cache(online_sinkhorn, ignore=['name']))
                                 (x_sampler, y_sampler, ref=ref, **config)
@@ -325,8 +346,8 @@ def plot_results():
     axes[1][1].set_xlabel('Samples')
     axes[0][0].set_ylabel('W err')
     axes[1][0].set_ylabel('Var err')
-    axes[0][0].set_ylim([1e-3, 1e2])
-    axes[1][0].set_ylim([1, 1e2])
+    # axes[0][0].set_ylim([1e-3, 1e2])
+    # axes[1][0].set_ylim([1, 1e2])
     axes[1][1].legend()
     plt.show()
 
