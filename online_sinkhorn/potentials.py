@@ -117,7 +117,6 @@ class OT:
                 else:
                     self.logb[:, :self.y_cursor] += np.log(1 - step_size)
                     self.logb[:, self.y_cursor:new_y_cursor] = np.log(step_size) - np.log(m)
-                    print(self.logb[:, :self.y_cursor])
             self.y_cursor = new_y_cursor
 
     def scale(self, *, scale_x=True, scale_y=True):
@@ -169,8 +168,6 @@ class OT:
             x, loga = x_sampler(batch_size)
             y, logb = y_sampler(batch_size)
             self.enrich(x=x, y=y, step_size=step_size, full=full)
-            w = self.compute_distance()
-            print('w', w)
             # if iter % 10 == 0:
             #     w = self.compute_distance()
             #     self.scale(scale_x=True, scale_y=True)
@@ -321,7 +318,7 @@ def run_OT():
 
     ot = OT(max_size=100, dimension=1)
     ot.online_sinkhorn(x_sampler, y_sampler, B=10, full=False)
-    ot.sinkhorn(xref, yref, 100)
+    # ot.sinkhorn(xref, yref, 100)
 
 def main():
     np.random.seed(0)
