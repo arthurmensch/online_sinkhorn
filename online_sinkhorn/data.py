@@ -14,6 +14,7 @@ class Subsampler:
         if new_cursor == len(self.x):
             np.random.shuffle(self.x)
             self.cursor = (self.cursor + n) % len(self.x)
+            self.cursor = (self.cursor + n) % len(self.x)
             x = np.concatenate([x, self.x[:self.cursor]], axis=0)
         else:
             self.cursor = new_cursor
