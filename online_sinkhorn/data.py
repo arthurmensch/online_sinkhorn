@@ -4,6 +4,7 @@ import numpy as np
 class Subsampler:
     def __init__(self, x):
         self.x = np.array(x, copy=True)
+        np.random.shuffle(self.x)
         self.dim = x.shape[1]
         self.cursor = 0
 

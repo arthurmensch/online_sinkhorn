@@ -1,16 +1,12 @@
 from os.path import expanduser
-from queue import Full
 
+import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 from joblib import Parallel, Memory, delayed
 from scipy.special import logsumexp
-from sklearn.model_selection import ParameterGrid
 
-from online_sinkhorn.data import Sampler, Subsampler
-
-import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
+from online_sinkhorn.data import Subsampler
 
 
 def compute_distance(x, y):
@@ -21,14 +17,16 @@ def compute_distance(x, y):
 
 # noinspection PyUnresolvedReferences
 class OT:
-    def __init__(self, max_size, dimension):
+    def __init__(self, max_size, dimension, averaging=False):
         self.distance = np.zeros((max_size, max_size))
         self.x = np.empty((max_size, dimension))
+        self.p = np.full((max_size, 1), fill_value=-np.float('inf'))
         self.y = np.empty((max_size, dimension))
-        self.f = np.full((max_size, 1), fill_value=-np.float('inf'))
-        self.loga = np.full((max_size, 1), fill_value=-np.float('inf'))
-        self.g = np.full((1, max_size), fill_value=-np.float('inf'))
-        self.logb = np.full((1, max_size), fill_value=-np.float('inf'))
+        self.q = np.full((1, max_size), fill_value=-np.float('inf'))
+
+        self.averaging = False
+        self.avg_p = np.full((max_size, 1), fill_value=-np.float('inf'))
+        self.avg_q = np.full((1, max_size), fill_value=-np.float('inf'))
 
         self.max_size = max_size
         self.x_cursor = 0
@@ -36,7 +34,7 @@ class OT:
 
         self.computations = 0
 
-    def enrich(self, *, x=None, y=None, step_size=1., full=False):
+    def partial_fit(self, *, x=None, y=None, step_size=1., full=False, avg_step_size=None):
         if x is None and y is None:
             raise ValueError
 
@@ -59,7 +57,7 @@ class OT:
                     else:
                         f = np.zeros((n, 1))
                 else:
-                    f = - logsumexp(self.g[:, :self.y_cursor] + self.logb[:, :self.y_cursor] - distance, axis=1,
+                    f = - logsumexp(self.q[:, :self.y_cursor] - distance, axis=1,
                                     keepdims=True)
                     self.computations += distance.shape[0] * distance.shape[1]
             else:
@@ -87,7 +85,7 @@ class OT:
                     else:
                         g = np.zeros((1, m))
                 else:
-                    g = - logsumexp(self.f[:self.x_cursor, :] + self.loga[:self.x_cursor, :] - distance, axis=0,
+                    g = - logsumexp(self.p[:self.x_cursor, :] - distance, axis=0,
                                     keepdims=True)
                     self.computations += distance.shape[0] * distance.shape[1]
             else:
@@ -101,294 +99,238 @@ class OT:
             self.computations += n * m
         if f is not None:
             if full:
-                self.f[:new_x_cursor, :] = f
-                self.loga[:new_x_cursor, :] = - np.log(new_x_cursor)
+                self.p[:new_x_cursor, :] = f - np.log(new_x_cursor)
             else:
-                self.f[self.x_cursor:new_x_cursor, :] = f
                 if step_size == 1.:
-                    self.loga[:self.x_cursor, :] = - float('inf')
-                    self.loga[self.x_cursor:new_x_cursor, :] = - np.log(n)
+                    self.p[:self.x_cursor, :] = - float('inf')
+                    self.p[self.x_cursor:new_x_cursor, :] = f - np.log(n)
                 else:
-                    self.loga[:self.x_cursor, :] += np.log(1 - step_size)
-                    self.loga[self.x_cursor:new_x_cursor, :] = np.log(step_size) - np.log(n)
+                    self.p[:self.x_cursor, :] += np.log(1 - step_size)
+                    self.p[self.x_cursor:new_x_cursor, :] = np.log(step_size) + f - np.log(n)
+                if self.averaging:
+                    if avg_step_size == 1.:
+                        self.avg_p[:new_x_cursor] = self.p[:new_x_cursor]
+                    else:
+                        self.avg_p[:new_x_cursor] = np.logaddexp(self.avg_p[:new_x_cursor] + math.log(1 - avg_step_size),
+                                                                 self.p[:new_x_cursor] + math.log(avg_step_size))
             self.x_cursor = new_x_cursor
         if g is not None:
             if full:
-                self.g[:, :new_y_cursor] = g
-                self.logb[:, :new_y_cursor] = - np.log(new_y_cursor)
+                self.q[:, :new_y_cursor] = g - np.log(new_y_cursor)
             else:
-                self.g[:, self.y_cursor:new_y_cursor] = g
                 if step_size == 1.:
-                    self.logb[:, :self.y_cursor] = - float('inf')
-                    self.logb[:, self.y_cursor:new_y_cursor] = - np.log(m)
+                    self.q[:, :self.y_cursor] = - float('inf')
+                    self.q[:, self.y_cursor:new_y_cursor] = g - np.log(m)
                 else:
-                    self.logb[:, :self.y_cursor] += np.log(1 - step_size)
-                    self.logb[:, self.y_cursor:new_y_cursor] = np.log(step_size) - np.log(m)
+                    self.q[:, :self.y_cursor] += np.log(1 - step_size)
+                    self.q[:, self.y_cursor:new_y_cursor] = np.log(step_size) + g - np.log(m)
+                if self.averaging:
+                    if avg_step_size == 1.:
+                        self.avg_q[:, :new_y_cursor] = self.q[:, :new_y_cursor]
+                    else:
+                        self.avg_q[:, :new_y_cursor] = np.logaddexp(self.avg_q[:, :new_y_cursor] + math.log(1 - avg_step_size),
+                                                                    self.q[:, :new_y_cursor] + math.log(avg_step_size))
             self.y_cursor = new_y_cursor
 
-    def scale(self, *, scale_x=True, scale_y=True):
+    def refit(self, *, refit_f=True, refit_g=True):
         if self.x_cursor == 0 or self.y_cursor == 0:
             return
-        if scale_x:
+        if refit_f:
             # shape (:self.x_cursor, 1)
-            f = - logsumexp(self.g[:, :self.y_cursor] + self.logb[:, :self.y_cursor]
+            f = - logsumexp(self.q[:, :self.y_cursor]
                             - self.distance[:self.x_cursor, :self.y_cursor],
                             axis=1, keepdims=True)
             self.computations += self.x_cursor * self.y_cursor
         else:
             f = None
-        if scale_y:
+        if refit_g:
             # shape (x_idx, 1)
-            g = - logsumexp(self.f[:self.x_cursor, :] + self.loga[:self.x_cursor, :]
+            g = - logsumexp(self.p[:self.x_cursor, :]
                             - self.distance[:self.x_cursor, :self.y_cursor],
                             axis=0, keepdims=True)
             self.computations += self.x_cursor * self.y_cursor
         else:
             g = None
 
-        if scale_x:
-            self.f[:self.x_cursor, :] = f
-            self.loga[:self.x_cursor, :] = - np.log(self.x_cursor)
-        if scale_y:
-            self.g[:, :self.y_cursor] = g
-            self.logb[:, :self.y_cursor] = - np.log(self.y_cursor)
+        if refit_f:
+            self.p[:self.x_cursor, :] = f - np.log(self.x_cursor)
+        if refit_g:
+            self.q[:, :self.y_cursor] = g - np.log(self.y_cursor)
 
-    def compute_distance(self, fast=False):
+    def compute_ot(self):
+        if self.averaging:
+            q, p = self.avg_q, self.avg_p
+        else:
+            q, p  =self.q, self.p
         distance = self.distance[:self.x_cursor, :self.y_cursor]
-        f = - logsumexp(self.g[:, :self.y_cursor] + self.logb[:, :self.y_cursor] - distance, axis=1, keepdims=True)
-        g = - logsumexp(self.f[:self.x_cursor] + self.loga[:self.x_cursor, :] - distance, axis=0, keepdims=True)
-        if fast:
-            offset = np.mean(f - (self.f + self.loga)[:self.x_cursor, :]) + np.mean(g - (self.g + self.logb)[:, :self.y_cursor]) / 2
-            return f.mean() + g.mean() - offset
+        f = - logsumexp(q[:, :self.y_cursor] - distance, axis=1, keepdims=True)
+        g = - logsumexp(p[:self.x_cursor] - distance, axis=0, keepdims=True)
+        ff = - logsumexp(g - distance, axis=1, keepdims=True) + np.log(self.y_cursor)
+        gg = - logsumexp(f - distance, axis=0, keepdims=True) + np.log(self.x_cursor)
+        return (f.mean() + ff.mean() + g.mean() + gg.mean()) / 2
+
+    def evaluate_potential(self, *, x=None, y=None):
+        if self.averaging:
+            q, p = self.avg_q, self.avg_p
         else:
-            ff = - logsumexp(g - distance, axis=1, keepdims=True) + np.log(self.y_cursor)
-            gg = - logsumexp(f - distance, axis=0, keepdims=True) + np.log(self.x_cursor)
-            return (f.mean() + ff.mean() + g.mean() + gg.mean()) / 2
-
-    def online_sinkhorn(self, x_sampler, y_sampler, A=1., B=10, a=1/2, b=1/2, full=False):
-        iter = 1
-        while self.x_cursor < self.max_size or self.y_cursor < self.max_size:
-            if a != 0:
-                step_size = A * np.float_power(iter, - a)
-                print(step_size)
-            else:
-                step_size = A
-            if b != 0:
-                batch_size = np.ceil(B * np.float_power(iter, b * 2)).astype(int)
-            else:
-                batch_size = B
-            x, loga = x_sampler(batch_size)
-            y, logb = y_sampler(batch_size)
-            self.enrich(x=x, y=y, step_size=step_size, full=full)
-            w = self.compute_distance()
-            print(f'Online computation {self.computations:.3e}, w {w}')
-            iter += 1
-        for i in range(4):
-            self.scale(scale_x=True, scale_y=True)
-            w = self.compute_distance()
-            print(f'Scale computation {self.computations:.3e}, w {w}')
-
-    def sinkhorn(self, x, y, n_iter=100):
-        self.enrich(x=x, y=y, step_size=1.)
-        # print('sinkhorn', self.distance)
-        for i in range(n_iter):
-            self.scale(scale_x=True, scale_y=True)
-            w = self.compute_distance()
-            print(f'Sinkhorn computation {self.computations:.3e}, w {w}')
-
-
-
-
-class Potential:
-    def __init__(self, max_size, dimension):
-        self.coefs = np.full(max_size, fill_value=-np.float('inf'))
-        self.avg_coefs = np.full(max_size, fill_value=-np.float('inf'))
-        self.positions = np.zeros((max_size, dimension))
-        self.cursor = 0
-        self.max_size = max_size
-        self.computations = 0
-        self.iter = 0
-
-    def evaluate(self, new_position, average=False):
-        if self.cursor == 0:
-            return np.zeros(len(new_position))
-        distance = compute_distance(self.positions[:self.cursor], new_position)
-        self.computations += self.cursor * len(new_position)
-        if average:
-            return - logsumexp(self.avg_coefs[:self.cursor][:, None] - distance, axis=0)
+            q, p = self.q, self.p
+        if x is not None:
+            distance = compute_distance(x, self.y[:self.y_cursor])
+            f = - logsumexp(q[:, :self.y_cursor] - distance, axis=1, keepdims=True)
         else:
-            return - logsumexp(self.coefs[:self.cursor][:, None] - distance, axis=0)
-
-    def enrich(self, new_positions, new_weights, new_potentials, step_size=1.):
-        self.iter += 1
-        assert 0 < step_size <= 1.
-        if step_size < 1:
-            new_cursor = self.cursor + len(new_positions)
-            if new_cursor > self.max_size:
-                raise Full
-
-            self.coefs[self.cursor:new_cursor] = new_weights + new_potentials + np.log(step_size)
-            self.positions[self.cursor:new_cursor] = new_positions
-            self.coefs[:self.cursor] += np.log(1 - step_size)
+            f = None
+        if y is not None:
+            distance = compute_distance(self.x[:self.x_cursor], y)
+            g = - logsumexp(p[:self.x_cursor, :] - distance, axis=0, keepdims=True)
         else:
-            new_cursor = len(new_positions)
-            if new_cursor > self.max_size:
-                raise Full
-            self.coefs[:new_cursor] = new_weights[:new_cursor] + new_potentials[:new_cursor]
-            self.positions[:new_cursor] = new_positions[:new_cursor]
-        self.avg_coefs[:self.cursor] = np.logaddexp(self.avg_coefs[:self.cursor] + np.log(1 - self.iter),
-                                                    self.coefs[:self.cursor] + np.log(self.iter))
-        self.cursor = new_cursor
-
-
-def sinkhorn(x, loga, y, logb, n_iter=100, simultaneous=False, fref=None, gref=None, xref=None, yref=None):
-    d = x.shape[1]
-    n = x.shape[0]
-    m = y.shape[0]
-    f = Potential(m, d)
-    g = Potential(n, d)
-    vs = []
-    computations = []
-    mems = []
-    for i in range(n_iter):
-        if simultaneous:
-            ff, gg = f.evaluate(x), g.evaluate(y)
-            f.enrich(y, logb, gg)
-            g.enrich(x, loga, ff)
+            g = None
+        if f is not None and g is not None:
+            return f, g
+        elif f is not None:
+            return f
+        elif g is not None:
+            return g
         else:
-            gg = g.evaluate(y)
-            f.enrich(y, logb, gg)
-            ff = f.evaluate(x)
-            g.enrich(x, loga, ff)
-        if fref is not None:
-            feval = f.evaluate(xref)
-            geval = g.evaluate(yref)
-            v = var_norm(fref - feval) + var_norm(gref - geval)
-            vs.append(v)
-            computations.append(f.computations + g.computations)
-            mems.append(f.cursor + g.cursor)
-    return f, g, vs, mems, computations
+            raise ValueError
+
+    @property
+    def full(self):
+        return self.x_cursor == self.max_size or self.y_cursor == self.max_size
 
 
-def online_sinkhorn(x_sampler, y_sampler, A=1., B=10, a=0., b=1., max_size=1000, fref=None, gref=None, xref=None,
-                    yref=None):
-    d = x_sampler.dim
-    f = Potential(max_size, d)
-    g = Potential(max_size, d)
-    iter = 1
-    vs = []
-    computations = []
-    mems = []
-    while f.cursor < max_size or g.cursor < max_size:
+def online_sinkhorn(x_sampler, y_sampler, A=1., B=10, a=1 / 2, b=1 / 2, full=False, max_size=1000, n_scale_iter=0,
+                    averaging=False, ref=None, name=None):
+    ot = OT(max_size=max_size, dimension=x_sampler.dim, averaging=averaging)
+    n_iter = 1
+
+    if ref is not None:
+        trace = []
+
+    def eval():
+        if ref is not None:
+            f, g = ot.evaluate_potential(x=ref['x'], y=ref['y'])
+            w = ot.compute_ot()
+            var_err = var_norm(f - ref['f']) + var_norm(g - ref['g'])
+            w_err = np.abs(w - ref['w'])
+            trace.append(dict(computations=ot.computations, samples=ot.x_cursor + ot.y_cursor,
+                              var_err=var_err, w_err=w_err))
+
+    while not ot.full:
         if a != 0:
-            step_size = A * np.float_power(iter, - a)
+            step_size = A * np.float_power(n_iter, - a)
         else:
             step_size = A
+        avg_step_size = 1 / n_iter
         if b != 0:
-            batch_size = np.floor(B * np.float_power(iter, b * 2)).astype(int)
+            batch_size = np.ceil(B * np.float_power(n_iter, b * 2)).astype(int)
         else:
             batch_size = B
+
         x, loga = x_sampler(batch_size)
         y, logb = y_sampler(batch_size)
-        ff, gg = f.evaluate(x), g.evaluate(y)
-        if (g.computations + g.computations) > max_size ** 2:
-            break
-        try:
-            f.enrich(y, logb, gg, step_size=step_size)
-            g.enrich(x, loga, ff, step_size=step_size)
-        except Full:
-            break
-        iter += 1
+        ot.partial_fit(x=x, y=y, step_size=step_size, full=full, avg_step_size=avg_step_size)
+        eval()
+        n_iter += 1
 
-        if fref is not None:
-            feval = f.evaluate(xref)
-            geval = g.evaluate(yref)
-            v = var_norm(fref - feval) + var_norm(gref - geval)
-            vs.append(v)
-            computations.append(f.computations + g.computations)
-            mems.append(f.cursor + g.cursor)
-    return f, g, vs, mems, computations
+    for i in range(n_scale_iter):
+        ot.refit(refit_f=True, refit_g=True)
+        eval()
+
+    if trace is not None:
+        return ot, trace
+    else:
+        return ot
+
+
+def sinkhorn(x, y, n_iter=100):
+    ot = OT(max_size=10000, dimension=x.shape[1])
+    ot.partial_fit(x=x, y=y, step_size=1.)  # Fill the cost matrix
+    # print('sinkhorn', self.distance)
+    for i in range(n_iter):
+        print(f'Iter {i}')
+        ot.refit(refit_f=True, refit_g=True)
+        w = ot.compute_ot()
+    f, g = ot.evaluate_potential(x=x, y=y)
+    return (f, g), w
 
 
 def var_norm(x):
     return np.max(x) - np.min(x)
 
+
 def run_OT():
     np.random.seed(0)
 
-    n = 10000
+    n = 20
+    n_ref_iter = 100
 
-    yref = np.random.randn(n, 5)
-    xref = np.random.randn(n, 5) + 10
-
-    x_sampler = Subsampler(xref)
-    y_sampler = Subsampler(yref)
-
-    ot = OT(max_size=10000, dimension=x_sampler.dim)
-    ot.online_sinkhorn(x_sampler, y_sampler, B=10, a=0., A=0.5, b=1, full=True)
-    ot = OT(max_size=10000, dimension=y_sampler.dim)
-    ot.sinkhorn(xref, yref, 100)
-
-def main():
-    np.random.seed(0)
-
-    n = 1000
-
-    x_sampler = Sampler(mean=np.array([[1.], [2], [3]]), cov=np.array([[[.1]], [[.1]], [[.1]]]),
-                        p=np.ones(3) / 3)
-    y_sampler = Sampler(mean=np.array([[0.], [3], [5]]), cov=np.array([[[.1]], [[.1]], [[.4]]]),
-                        p=np.ones(3) / 3)
-    xref, loga = x_sampler(n)
-    yref, logb = y_sampler(n)
-
-    yref = np.random.randn(n, 5)
-    xref = np.random.randn(n, 5) + 2
-    loga = np.full((n, ), fill_value=-np.log(n))
-    logb = np.full((n, ), fill_value=-np.log(n))
-
-    f, g, _, _, _ = sinkhorn(xref, loga, yref, logb)
-    fref = f.evaluate(xref)
-    gref = g.evaluate(yref)
-
-    x_sampler = Subsampler(xref)
-    y_sampler = Subsampler(yref)
+    x = np.random.randn(n, 5)
+    y = np.random.randn(n, 5) + 10
 
     mem = Memory(location=expanduser('~/cache'))
 
-    params = list(iter(ParameterGrid(dict(a=np.linspace(0, 1, 5), b=np.linspace(0, 1, 5)))))
-    res = Parallel(n_jobs=5)(
-        delayed(mem.cache(online_sinkhorn))(x_sampler, y_sampler, max_size=n * 10, B=10, A=.5,
-                                            a=p['a'], b=p['b'], fref=fref, gref=gref,
-                                            xref=xref, yref=yref) for p in params)
+    (f, g), w = mem.cache(sinkhorn)(x, y, n_ref_iter)
+    ref = dict(f=f, g=g, x=x, y=y, w=w)
 
-    df = []
-    for p, (_, _, vs, mems, computations) in zip(params, res):
-        for i, (v, mem, computation) in enumerate(zip(vs, mems, computations)):
-            df.append(dict(mem=mem, v=v, computation=computation, a=p["a"], b=p["b"], iter=i))
-    df = pd.DataFrame(df)
-    df.to_pickle('results.pkl')
+    x_sampler = Subsampler(x)
+    y_sampler = Subsampler(y)
+    n_scale_iter = 0
+    max_size = n * 100
+    configs = [dict(a=0., b=0., B=n, A=1, full=False, max_size=n * 100, n_scale_iter=0, name="Sinkhorn"),
+               dict(a=1., b=0., B=n, A=1, full=False, max_size=n * 100, n_scale_iter=0, name="Sinkhorn slowed"),]
+               # dict(a=0., b=0., B=10, A=1, full=False, max_size=10, n_scale_iter=n_ref_iter, name="Partial Sinkhorn"),
+               # dict(a=0., b=0., B=10, A=1, full=False, max_size=max_size, n_scale_iter=n_scale_iter,
+               #      name="Randomized Sinkhorn"),
+               # dict(a=0., b=1., B=10, A=1, full=False, max_size=max_size, n_scale_iter=n_scale_iter,
+               #      name="Randomized Sinkhorn + growing batch"),
+               # dict(a=0., b=0., B=10, A=1, full=False, max_size=max_size, n_scale_iter=n_scale_iter,
+               #      averaging=True,
+               #      name="Randomized Sinkhorn + averaging"),
+               # dict(a=0., b=1., B=10, A=1, full=True, max_size=max_size, n_scale_iter=n_scale_iter,
+               #      name="Full-refit randomized Sinkhorn"),
+               # dict(a=1., b=0.1, B=10, A=1, full=False, max_size=max_size, n_scale_iter=n_scale_iter,
+               #      name="Online Sinkhorn 1/n"),
+               # dict(a=1. / 2, b=1/2, B=10, A=1, full=False, max_size=max_size, n_scale_iter=n_scale_iter,
+               #      name="Online Sinkhorn 1/sqrt(n)"),
+               # dict(a=1. / 2, b=1/2, B=10, A=1, full=False, max_size=max_size, n_scale_iter=n_scale_iter,
+               #      name="Online Sinkhorn 1/sqrt(n) + averaging", averaging=True),
+               # dict(a=1. / 2, b=1 / 2, B=10, A=1, full=True, max_size=max_size, n_scale_iter=n_scale_iter,
+               #      name="Online full-refit Sinkhorn")]
+
+    traces = Parallel(n_jobs=5)(delayed(mem.cache(online_sinkhorn, ignore=['name']))
+                                (x_sampler, y_sampler, ref=ref, **config)
+                                for config in configs)
+    dfs = []
+    for (ot, trace), config in zip(traces, configs):
+        df = pd.DataFrame(trace)
+        for key, value in config.items():
+            df[key] = value
+        dfs.append(df)
+    dfs = pd.concat(dfs, axis=0)
+    dfs.to_pickle('results.pkl')
 
 
-def plot():
+def plot_results():
     df = pd.read_pickle('results.pkl')
-    print(df)
-    facet = sns.FacetGrid(data=df, hue="a", col="b")
-    facet.map(plt.plot, 'mem', 'v')
-    facet.add_legend()
-    for ax in facet.axes.ravel():
+    fig, axes = plt.subplots(2, 2, sharex='col', sharey='row')
+    for name, sub_df in df.groupby(by='name'):
+        axes[0][0].plot(sub_df['computations'], sub_df['w_err'], label=name)
+        axes[1][0].plot(sub_df['computations'], sub_df['var_err'], label=name)
+        axes[0][1].plot(sub_df['samples'], sub_df['w_err'], label=name)
+        axes[1][1].plot(sub_df['samples'], sub_df['var_err'], label=name)
+    for ax in axes.ravel():
         ax.set_yscale('log')
         ax.set_xscale('log')
-
-    facet = sns.FacetGrid(data=df, hue="a", col="b")
-    facet.map(plt.plot, 'computation', 'v')
-    facet.add_legend()
-    for ax in facet.axes.ravel():
-        ax.set_yscale('log')
-        ax.set_xscale('log')
+    axes[1][0].set_xlabel('Computations')
+    axes[1][1].set_xlabel('Samples')
+    axes[0][0].set_ylabel('W err')
+    axes[1][0].set_ylabel('Var err')
+    axes[0][0].set_ylim([1e-3, 1e2])
+    axes[1][0].set_ylim([1, 1e2])
+    axes[1][1].legend()
     plt.show()
 
 
 if __name__ == '__main__':
-    # main()
-    # plot()
     run_OT()
+    plot_results()
