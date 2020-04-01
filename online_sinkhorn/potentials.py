@@ -155,7 +155,7 @@ class OT:
         # return (((self.f[:self.x_cursor] + f) * np.exp(self.loga[:self.x_cursor])).sum()
         #         + ((self.g[:, :self.y_cursor] + g) * np.exp(self.logb[:, :self.y_cursor])).sum()) / 2
 
-    def online_sinkhorn(self, x_sampler, y_sampler, A=1., B=10, a=1, b=1/2, full=False):
+    def online_sinkhorn(self, x_sampler, y_sampler, A=1., B=10, a=1/2, b=1/2, full=False):
         iter = 1
         while self.x_cursor < self.max_size or self.y_cursor < self.max_size:
             if a != 0:
@@ -311,7 +311,7 @@ def var_norm(x):
 def run_OT():
     np.random.seed(0)
 
-    n = 10
+    n = 100
 
     yref = np.random.randn(n, 1)
     xref = np.random.randn(n, 1) + 10
@@ -321,7 +321,7 @@ def run_OT():
 
     ot = OT(max_size=100, dimension=1)
     ot.online_sinkhorn(x_sampler, y_sampler, B=10, full=False)
-    # ot.sinkhorn(xref, yref, 100)
+    ot.sinkhorn(xref, yref, 100)
 
 def main():
     np.random.seed(0)

@@ -297,11 +297,11 @@
       <screen x="0" y="27" width="1920" height="1053" />
     </state>
     <state x="731" y="265" width="448" height="574" key="#com.jetbrains.python.refactoring.move.PyMoveModuleMembersDialog/0.27.1920.1053@0.27.1920.1053" timestamp="1581767339373" />
-    <state x="713" y="184" width="846" height="809" key="CommitChangelistDialog2" timestamp="1585730569575">
+    <state x="713" y="184" width="846" height="809" key="CommitChangelistDialog2" timestamp="1585733540936">
       <screen x="0" y="27" width="2560" height="1413" />
     </state>
     <state x="535" y="136" width="845" height="817" key="CommitChangelistDialog2/0.27.1920.1053@0.27.1920.1053" timestamp="1580915501228" />
-    <state x="713" y="184" width="846" height="809" key="CommitChangelistDialog2/0.27.2560.1413@0.27.2560.1413" timestamp="1585730569575" />
+    <state x="713" y="184" width="846" height="809" key="CommitChangelistDialog2/0.27.2560.1413@0.27.2560.1413" timestamp="1585733540936" />
     <state x="100" y="127" width="1720" height="853" key="DiffContextDialog" timestamp="1580919859409">
       <screen x="0" y="27" width="1920" height="1053" />
     </state>
@@ -311,30 +311,30 @@
     </state>
     <state x="727" y="295" width="455" height="515" key="FileChooserDialogImpl/0.27.1920.1053@0.27.1920.1053" timestamp="1580562650320" />
     <state x="969" y="387" width="426" height="514" key="FileChooserDialogImpl/0.27.2560.1413@0.27.2560.1413" timestamp="1581013481150" />
-    <state width="2512" height="838" key="GridCell.Tab.0.bottom" timestamp="1585733219041">
+    <state width="2512" height="838" key="GridCell.Tab.0.bottom" timestamp="1585733510553">
       <screen x="0" y="27" width="2560" height="1413" />
     </state>
     <state width="1872" height="408" key="GridCell.Tab.0.bottom/0.27.1920.1053@0.27.1920.1053" timestamp="1581892567823" />
     <state width="2512" height="486" key="GridCell.Tab.0.bottom/0.27.2560.1413/2560.0.3840.2160@0.27.2560.1413" timestamp="1580736316379" />
-    <state width="2512" height="838" key="GridCell.Tab.0.bottom/0.27.2560.1413@0.27.2560.1413" timestamp="1585733219041" />
-    <state width="2512" height="838" key="GridCell.Tab.0.center" timestamp="1585733219040">
+    <state width="2512" height="838" key="GridCell.Tab.0.bottom/0.27.2560.1413@0.27.2560.1413" timestamp="1585733510553" />
+    <state width="2512" height="838" key="GridCell.Tab.0.center" timestamp="1585733510552">
       <screen x="0" y="27" width="2560" height="1413" />
     </state>
     <state width="1872" height="408" key="GridCell.Tab.0.center/0.27.1920.1053@0.27.1920.1053" timestamp="1581892567822" />
     <state width="2512" height="486" key="GridCell.Tab.0.center/0.27.2560.1413/2560.0.3840.2160@0.27.2560.1413" timestamp="1580736316379" />
-    <state width="2512" height="838" key="GridCell.Tab.0.center/0.27.2560.1413@0.27.2560.1413" timestamp="1585733219040" />
-    <state width="2512" height="838" key="GridCell.Tab.0.left" timestamp="1585733219039">
+    <state width="2512" height="838" key="GridCell.Tab.0.center/0.27.2560.1413@0.27.2560.1413" timestamp="1585733510552" />
+    <state width="2512" height="838" key="GridCell.Tab.0.left" timestamp="1585733510551">
       <screen x="0" y="27" width="2560" height="1413" />
     </state>
     <state width="1872" height="408" key="GridCell.Tab.0.left/0.27.1920.1053@0.27.1920.1053" timestamp="1581892567821" />
     <state width="2512" height="486" key="GridCell.Tab.0.left/0.27.2560.1413/2560.0.3840.2160@0.27.2560.1413" timestamp="1580736316379" />
-    <state width="2512" height="838" key="GridCell.Tab.0.left/0.27.2560.1413@0.27.2560.1413" timestamp="1585733219039" />
-    <state width="2512" height="838" key="GridCell.Tab.0.right" timestamp="1585733219040">
+    <state width="2512" height="838" key="GridCell.Tab.0.left/0.27.2560.1413@0.27.2560.1413" timestamp="1585733510551" />
+    <state width="2512" height="838" key="GridCell.Tab.0.right" timestamp="1585733510552">
       <screen x="0" y="27" width="2560" height="1413" />
     </state>
     <state width="1872" height="408" key="GridCell.Tab.0.right/0.27.1920.1053@0.27.1920.1053" timestamp="1581892567823" />
     <state width="2512" height="486" key="GridCell.Tab.0.right/0.27.2560.1413/2560.0.3840.2160@0.27.2560.1413" timestamp="1580736316379" />
-    <state width="2512" height="838" key="GridCell.Tab.0.right/0.27.2560.1413@0.27.2560.1413" timestamp="1585733219040" />
+    <state width="2512" height="838" key="GridCell.Tab.0.right/0.27.2560.1413@0.27.2560.1413" timestamp="1585733510552" />
     <state width="2512" height="481" key="GridCell.Tab.1.bottom" timestamp="1585732458695">
       <screen x="0" y="27" width="2560" height="1413" />
     </state>
@@ -365,11 +365,11 @@
     </state>
     <state width="498" height="452" key="SwitcherDM/0.27.1920.1053@0.27.1920.1053" timestamp="1580646918432" />
     <state width="664" height="607" key="SwitcherDM/0.27.2560.1413@0.27.2560.1413" timestamp="1585152303572" />
-    <state x="874" y="468" width="802" height="528" key="Vcs.Push.Dialog.v2" timestamp="1585730570702">
+    <state x="874" y="468" width="802" height="528" key="Vcs.Push.Dialog.v2" timestamp="1585733538023">
       <screen x="0" y="27" width="2560" height="1413" />
     </state>
     <state x="656" y="348" width="802" height="528" key="Vcs.Push.Dialog.v2/0.27.1920.1053@0.27.1920.1053" timestamp="1580915504076" />
-    <state x="874" y="468" width="802" height="528" key="Vcs.Push.Dialog.v2/0.27.2560.1413@0.27.2560.1413" timestamp="1585730570702" />
+    <state x="874" y="468" width="802" height="528" key="Vcs.Push.Dialog.v2/0.27.2560.1413@0.27.2560.1413" timestamp="1585733538023" />
     <state width="960" height="527" key="XDebugger.FullValuePopup" timestamp="1581669729825">
       <screen x="0" y="27" width="1920" height="1053" />
     </state>
@@ -549,7 +549,7 @@
     <SUITE FILE_PATH="coverage/online_sinkhorn$averaging.coverage" NAME="averaging Coverage Results" MODIFIED="1580894950205" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/online_sinkhorn$exp.coverage" NAME="exp Coverage Results" MODIFIED="1576762123637" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/online_sinkhorn$gw.coverage" NAME="gw Coverage Results" MODIFIED="1574595020683" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
-    <SUITE FILE_PATH="coverage/online_sinkhorn$potentials.coverage" NAME="potentials Coverage Results" MODIFIED="1585733213254" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/online_sinkhorn" />
+    <SUITE FILE_PATH="coverage/online_sinkhorn$potentials.coverage" NAME="potentials Coverage Results" MODIFIED="1585733501885" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/online_sinkhorn" />
     <SUITE FILE_PATH="coverage/online_sinkhorn$discrete_online_sinkhorn.coverage" NAME="discrete_online_sinkhorn Coverage Results" MODIFIED="1581892557517" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/code" />
     <SUITE FILE_PATH="coverage/online_sinkhorn$unrolled.coverage" NAME="unrolled Coverage Results" MODIFIED="1571235341496" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/online_sinkhorn$clean.coverage" NAME="clean Coverage Results" MODIFIED="1581797958957" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
