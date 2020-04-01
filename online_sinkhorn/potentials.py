@@ -25,8 +25,11 @@ class OT:
         self.distance = np.zeros((max_size, max_size))
         self.x = np.empty((max_size, dimension))
         self.y = np.empty((max_size, dimension))
-        self.q = np.full((1, max_size), fill_value=-np.float('inf'))  # f representation
-        self.p = np.full((max_size, 1), fill_value=-np.float('inf'))  # g representation
+        self.f = np.full((max_size, 1), fill_value=-np.float('inf'))
+        self.loga = np.full((max_size, 1), fill_value=-np.float('inf'))
+        self.g = np.full((1, max_size), fill_value=-np.float('inf'))
+        self.logb = np.full((1, max_size), fill_value=-np.float('inf'))
+
         self.max_size = max_size
         self.x_cursor = 0
         self.y_cursor = 0
@@ -53,7 +56,8 @@ class OT:
                     else:
                         f = np.zeros((n, 1))
                 else:
-                    f = - logsumexp(self.q[:, :self.y_cursor] - distance, axis=1, keepdims=True)
+                    f = - logsumexp(self.g[:, :self.y_cursor] + self.logb[:, :self.y_cursor] - distance, axis=1,
+                                    keepdims=True)
             else:
                 f = None
         else:
@@ -78,7 +82,8 @@ class OT:
                     else:
                         g = np.zeros((1, m))
                 else:
-                    g = - logsumexp(self.p[:self.x_cursor, :] - distance, axis=0, keepdims=True)
+                    g = - logsumexp(self.f[:self.x_cursor, :] + self.loga[:self.x_cursor, :] - distance, axis=0,
+                                    keepdims=True)
             else:
                 g = None
         else:
@@ -89,73 +94,68 @@ class OT:
             self.distance[self.x_cursor:new_x_cursor, self.y_cursor:new_y_cursor] = compute_distance(x, y)
         if f is not None:
             if full:
-                self.p[:new_x_cursor, :] = f - np.log(new_x_cursor)
+                self.f[:new_x_cursor, :] = f
+                self.loga[:new_x_cursor, :] = - np.log(new_x_cursor)
             else:
+                self.f[self.x_cursor:new_x_cursor, :] = f
                 if step_size == 1.:
-                    self.p[:self.x_cursor, :] = - float('inf')
-                    self.p[self.x_cursor:new_x_cursor, :] = f - np.log(n)
+                    self.loga[:self.x_cursor, :] = - float('inf')
+                    self.loga[self.x_cursor:new_x_cursor, :] = - np.log(n)
                 else:
-                    self.p[:self.x_cursor, :] += np.log(1 - step_size)
-                    self.p[self.x_cursor:new_x_cursor, :] = np.log(step_size) + f - np.log(n)
+                    self.loga[:self.x_cursor, :] += np.log(1 - step_size)
+                    self.loga[self.x_cursor:new_x_cursor, :] = np.log(step_size) - np.log(n)
             self.x_cursor = new_x_cursor
         if g is not None:
             if full:
-                self.q[:, :new_y_cursor] = g - np.log(new_y_cursor)
+                self.g[:, :new_y_cursor] = g
+                self.logb[:, :new_y_cursor] = - np.log(new_y_cursor)
             else:
+                self.g[:, self.y_cursor:new_y_cursor] = g
                 if step_size == 1.:
-                    self.q[:, :self.y_cursor] = - float('inf')
-                    self.q[:, self.y_cursor:new_y_cursor] = g - np.log(m)
+                    self.logb[:, :self.y_cursor] = - float('inf')
+                    self.logb[:, self.y_cursor:new_y_cursor] = - np.log(m)
                 else:
-                    self.q[:, :self.y_cursor] += np.log(1 - step_size)
-                    self.q[:, self.y_cursor:new_y_cursor] = np.log(step_size) + g - np.log(m)
+                    self.logb[:, :self.y_cursor] += np.log(1 - step_size)
+                    self.logb[:, self.y_cursor:new_y_cursor] = np.log(step_size) - np.log(m)
+                    print(self.logb[:, :self.y_cursor])
             self.y_cursor = new_y_cursor
-
-    def evaluate(self, *, x=None, y=None):
-        if x is not None and y is not None:
-            raise ValueError
-        elif x is not None:
-            distance = compute_distance(x, self.y[:self.y_cursor])
-            return - logsumexp(self.q[:, :self.y_cursor] - distance, axis=1)
-        elif x is not None:
-            distance = compute_distance(self.x[:self.x_cursor], y)
-            return - logsumexp(self.p[:self.x_cursor, :] - distance, axis=0)
-        else:
-            raise ValueError
 
     def scale(self, *, scale_x=True, scale_y=True):
         if self.x_cursor == 0 or self.y_cursor == 0:
             return
         if scale_x:
             # shape (:self.x_cursor, 1)
-            f = - logsumexp(self.q[:, :self.y_cursor]
+            f = - logsumexp(self.g[:, :self.y_cursor] + self.logb[:, :self.y_cursor]
                             - self.distance[:self.x_cursor, :self.y_cursor],
                             axis=1, keepdims=True)
         else:
             f = None
         if scale_y:
             # shape (x_idx, 1)
-            g = - logsumexp(self.p[:self.x_cursor, :]
+            g = - logsumexp(self.f[:self.x_cursor, :] + self.loga[:self.x_cursor, :]
                             - self.distance[:self.x_cursor, :self.y_cursor],
                             axis=0, keepdims=True)
         else:
             g = None
 
         if scale_x:
-            self.p[:self.x_cursor, :] = f - np.log(self.x_cursor)
+            self.f[:self.x_cursor, :] = f
+            self.loga[:self.x_cursor, :] = - np.log(self.x_cursor)
         if scale_y:
-            self.q[:, :self.y_cursor] = g - np.log(self.y_cursor)
+            self.g[:, :self.y_cursor] = g
+            self.logb[:, :self.y_cursor] = - np.log(self.y_cursor)
 
     def compute_distance(self):
         distance = self.distance[:self.x_cursor, :self.y_cursor]
-        # gg = self.q[:, :self.y_cursor] + np.log(self.y_cursor)
-        # ff = self.p[:self.x_cursor] + np.log(self.x_cursor)
-        f = - logsumexp(self.q[:, :self.y_cursor] - distance, axis=1, keepdims=True)
-        g = - logsumexp(self.p[:self.x_cursor] - distance, axis=0, keepdims=True)
+        f = - logsumexp(self.g[:, :self.y_cursor] + self.logb[:, :self.y_cursor] - distance, axis=1, keepdims=True)
+        g = - logsumexp(self.f[:self.x_cursor] + self.loga[:self.x_cursor, :] - distance, axis=0, keepdims=True)
         ff = - logsumexp(g - distance, axis=1, keepdims=True) + np.log(self.y_cursor)
         gg = - logsumexp(f - distance, axis=0, keepdims=True) + np.log(self.x_cursor)
         return (f.mean() + ff.mean() + g.mean() + gg.mean()) / 2
+        # return (((self.f[:self.x_cursor] + f) * np.exp(self.loga[:self.x_cursor])).sum()
+        #         + ((self.g[:, :self.y_cursor] + g) * np.exp(self.logb[:, :self.y_cursor])).sum()) / 2
 
-    def online_sinkhorn(self, x_sampler, y_sampler, A=1., B=10, a=1/2, b=1/2, full=False):
+    def online_sinkhorn(self, x_sampler, y_sampler, A=1., B=10, a=1, b=1/2, full=False):
         iter = 1
         while self.x_cursor < self.max_size or self.y_cursor < self.max_size:
             if a != 0:
@@ -169,6 +169,8 @@ class OT:
             x, loga = x_sampler(batch_size)
             y, logb = y_sampler(batch_size)
             self.enrich(x=x, y=y, step_size=step_size, full=full)
+            w = self.compute_distance()
+            print('w', w)
             # if iter % 10 == 0:
             #     w = self.compute_distance()
             #     self.scale(scale_x=True, scale_y=True)
@@ -178,8 +180,6 @@ class OT:
         w = self.compute_distance()
         for i in range(10):
             self.scale(scale_x=True, scale_y=True)
-            w = self.compute_distance()
-            print('w', w)
         wnew = self.compute_distance()
         print(f'last rescale {w}->{wnew}')
 
@@ -311,7 +311,7 @@ def var_norm(x):
 def run_OT():
     np.random.seed(0)
 
-    n = 1000
+    n = 10
 
     yref = np.random.randn(n, 1)
     xref = np.random.randn(n, 1) + 10
@@ -319,11 +319,9 @@ def run_OT():
     x_sampler = Subsampler(xref)
     y_sampler = Subsampler(yref)
 
-    ot = OT(max_size=1000, dimension=1)
-    ot.online_sinkhorn(x_sampler, y_sampler, B=10, full=True)
-    print('ref')
-    ot = OT(max_size=1000, dimension=1)
-    ot.sinkhorn(xref, yref, 100)
+    ot = OT(max_size=100, dimension=1)
+    ot.online_sinkhorn(x_sampler, y_sampler, B=10, full=False)
+    # ot.sinkhorn(xref, yref, 100)
 
 def main():
     np.random.seed(0)
