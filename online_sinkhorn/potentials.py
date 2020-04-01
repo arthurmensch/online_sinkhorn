@@ -61,7 +61,7 @@ class OT:
                 else:
                     f = - logsumexp(self.g[:, :self.y_cursor] + self.logb[:, :self.y_cursor] - distance, axis=1,
                                     keepdims=True)
-                    self.computations += self.y_cursor * n
+                    self.computations += distance.shape[0] * distance.shape[1]
             else:
                 f = None
         else:
@@ -89,7 +89,7 @@ class OT:
                 else:
                     g = - logsumexp(self.f[:self.x_cursor, :] + self.loga[:self.x_cursor, :] - distance, axis=0,
                                     keepdims=True)
-                    self.computations += self.x_cursor * m
+                    self.computations += distance.shape[0] * distance.shape[1]
             else:
                 g = None
         else:
@@ -170,6 +170,7 @@ class OT:
         while self.x_cursor < self.max_size or self.y_cursor < self.max_size:
             if a != 0:
                 step_size = A * np.float_power(iter, - a)
+                print(step_size)
             else:
                 step_size = A
             if b != 0:
@@ -324,7 +325,7 @@ def run_OT():
     y_sampler = Subsampler(yref)
 
     ot = OT(max_size=10000, dimension=x_sampler.dim)
-    ot.online_sinkhorn(x_sampler, y_sampler, B=10, a=0, b=1, full=True)
+    ot.online_sinkhorn(x_sampler, y_sampler, B=10, a=0., A=0.5, b=1, full=False)
     ot = OT(max_size=10000, dimension=y_sampler.dim)
     ot.sinkhorn(xref, yref, 100)
 
