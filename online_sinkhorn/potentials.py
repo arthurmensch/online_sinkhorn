@@ -316,7 +316,7 @@ def run_OT():
     x_sampler = Subsampler(xref)
     y_sampler = Subsampler(yref)
 
-    ot = OT(max_size=100, dimension=1)
+    ot = OT(max_size=1000, dimension=1)
     ot.online_sinkhorn(x_sampler, y_sampler, B=10, full=False)
     # ot.sinkhorn(xref, yref, 100)
 
