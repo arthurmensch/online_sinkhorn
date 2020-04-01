@@ -169,17 +169,10 @@ class OT:
             x, loga = x_sampler(batch_size)
             y, logb = y_sampler(batch_size)
             self.enrich(x=x, y=y, step_size=step_size, full=full)
-            # if iter % 10 == 0:
-            #     w = self.compute_distance()
-            #     self.scale(scale_x=True, scale_y=True)
-            #     wnew = self.compute_distance()
-            #     print(f'rescale {w}->{wnew}')
             iter += 1
         w = self.compute_distance()
         for i in range(10):
             self.scale(scale_x=True, scale_y=True)
-            w = self.compute_distance()
-            print('w', w)
         wnew = self.compute_distance()
         print(f'last rescale {w}->{wnew}')
 
@@ -321,9 +314,9 @@ def run_OT():
 
     ot = OT(max_size=100, dimension=1)
     ot.online_sinkhorn(x_sampler, y_sampler, B=10, full=False)
-    print('ref')
-    ot = OT(max_size=100, dimension=1)
-    ot.sinkhorn(xref, yref, 100)
+    # print('ref')
+    # ot = OT(max_size=100, dimension=1)
+    # ot.sinkhorn(xref, yref, 100)
 
 def main():
     np.random.seed(0)
