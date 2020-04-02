@@ -313,8 +313,8 @@ class OT:
         return self
 
     def random_sinkhorn_loop(self, x_sampler, y_sampler):
-        while self.n_updates_ < self.max_updates:
-            if self.batch_size_exp != 0:
+        while self.n_updates_ < self.max_updates and not self.is_full:
+            if self.batch_size_exp != 0.:
                 batch_size = np.ceil(
                     self.batch_size * np.float_power((self.n_updates_ + 1), self.batch_size_exp * 2)).astype(
                     int)
@@ -359,7 +359,7 @@ def online_sinkhorn(x_sampler, y_sampler, max_size, ref=None, step_size=1., step
     else:
         callback = None
     ot = OT(dimension=x_sampler.dim, max_updates=max_updates, callback=callback,
-            max_size=max_size,
+            max_size=max_size, no_memory=False,
             step_size=step_size, step_size_exp=step_size_exp,
             batch_size=batch_size, batch_size_exp=batch_size_exp, avg_step_size=avg_step_size,
             avg_step_size_exp=avg_step_size_exp, averaging=averaging,
@@ -373,22 +373,20 @@ def online_sinkhorn(x_sampler, y_sampler, max_size, ref=None, step_size=1., step
     return ot
 
 
-def random_sinkhorn(x_sampler, y_sampler, max_size, ref=None, step_size=1., step_size_exp=0.,
-                    batch_size=1, batch_size_exp=0., averaging=False,
-                    max_updates='auto', full_update=False, refine_updates=0):
+def random_sinkhorn(x_sampler, y_sampler, max_size, ref=None,
+                    batch_size=1, batch_size_exp=0.,
+                    max_updates=100, refine_updates=0):
     if ref is not None:
         callback = Callback(ref)
     else:
         callback = None
     ot = OT(dimension=x_sampler.dim, max_updates=max_updates, callback=callback,
-            max_size=max_size,
-            step_size=step_size, step_size_exp=step_size_exp, no_memory=no_memory,
-            batch_size=batch_size, batch_size_exp=batch_size_exp, avg_step_size=avg_step_size,
-            avg_step_size_exp=avg_step_size_exp, averaging=averaging,
-            full_update=full_update,
+            max_size=max_size, no_memory=True,
+            batch_size=batch_size, batch_size_exp=batch_size_exp,
             )
-    ot.online_sinkhorn_loop(x_sampler, y_sampler)
+    ot.random_sinkhorn_loop(x_sampler, y_sampler)
     if refine_updates > 0:
+        ot.reset(x_sampler(ot.max_size), y_sampler(ot.max_size))
         ot.set_params(max_updates=refine_updates, step_size=1., step_size_exp=0.,
                       averaging=False)
         ot.sinkhorn_loop()
