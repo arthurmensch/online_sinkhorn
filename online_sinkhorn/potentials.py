@@ -1,4 +1,5 @@
 from os.path import expanduser
+from typing import Union
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -15,189 +16,250 @@ def compute_distance(x, y):
     return x2[:, None] + y2[None, :] - 2 * x @ y.T
 
 
-# noinspection PyUnresolvedReferences
 class OT:
-    def __init__(self, max_size, dimension, averaging=False):
-        self.distance = np.zeros((max_size, max_size))
-        self.x = np.empty((max_size, dimension))
-        self.p = np.full((max_size, 1), fill_value=-np.float('inf'))
-        self.y = np.empty((max_size, dimension))
-        self.q = np.full((1, max_size), fill_value=-np.float('inf'))
-
-        self.averaging = False
-        self.avg_p = np.full((max_size, 1), fill_value=-np.float('inf'))
-        self.avg_q = np.full((1, max_size), fill_value=-np.float('inf'))
-
+    def __init__(self, max_size, dimension, callback=None, step_size=1., step_size_exp=0.,
+                 batch_size=1, batch_size_exp=0., avg_step_size=1., avg_step_size_exp=0.,
+                 no_memory=False, full_update=False, max_updates: Union[str, int] = 'auto', averaging=False):
         self.max_size = max_size
-        self.x_cursor = 0
-        self.y_cursor = 0
+        self.callback = callback
+        self.dimension = dimension
+        self.step_size = step_size
+        self.step_size_exp = step_size_exp
+        self.batch_size = batch_size
+        self.batch_size_exp = batch_size_exp
+        self.avg_step_size = avg_step_size
+        self.avg_step_size_exp = avg_step_size_exp
+        self.full_update = full_update
+        self.max_updates = max_updates
+        self.no_memory = no_memory
 
-        self.computations = 0
+        self.averaging = averaging
 
-    def partial_fit(self, *, x=None, y=None, step_size=1., full=False, avg_step_size=None):
+        if no_memory and averaging:
+            raise NotImplementedError
+
+        # Attributes
+        self.distance_ = np.zeros((max_size, max_size))
+        self.x_ = np.empty((max_size, dimension))
+        self.p_ = np.full((max_size, 1), fill_value=-np.float('inf'))
+        self.y_ = np.empty((max_size, dimension))
+        self.q_ = np.full((1, max_size), fill_value=-np.float('inf'))
+
+        if self.averaging:
+            self.avg_p_ = np.full((max_size, 1), fill_value=-np.float('inf'))
+            self.avg_q_ = np.full((1, max_size), fill_value=-np.float('inf'))
+
+        self.x_cursor_ = 0
+        self.y_cursor_ = 0
+        self.computations_ = 0
+        self.n_updates_ = 0
+
+    def _callback(self):
+        if self.callback is not None:
+            self.callback(self)
+
+    def set_params(self, **params):
+        for key, value in params:
+            self.__setattr__(key, value)
+
+    @property
+    def is_full(self):
+        return self.x_cursor_ == self.max_size or self.y_cursor_ == self.max_size
+
+    def random_fit(self, *, x=None, y=None):
+        if x is None and y is None:
+            raise ValueError
+        if x is not None:
+            n = x.shape[0]
+            self.x_cursor_ = n
+            self.x_[:self.x_cursor_] = x
+            distance = compute_distance(x, self.y_[:self.y_cursor_])
+            f = - logsumexp(self.q_[:, :self.y_cursor_] - distance, axis=1,
+                            keepdims=True)
+        else:
+            f = None
+        if y is not None:
+            m = y.shape[0]
+            self.y_cursor_ = m
+            self.y_[:self.y_cursor_] = y
+            distance = compute_distance(self.x_[:self.x_cursor_], y)
+            g = - logsumexp(self.p_[:self.x_cursor_, :] - distance, axis=0,
+                            keepdims=True)
+        else:
+            g = None
+        if f is not None:
+            self.p_[:self.x_cursor_] = f - np.log(n)
+        if g is not None:
+            self.q_[:, self.x_cursor_] = g - np.log(m)
+        self.n_updates_ += 1
+
+    def partial_fit(self, *, x=None, y=None, step_size=1., full_update=False, avg_step_size=1.):
         if x is None and y is None:
             raise ValueError
 
         if x is not None:
             n = x.shape[0]
-            new_x_cursor = min(self.x_cursor + n, self.max_size)
-            n = new_x_cursor - self.x_cursor
+            new_x_cursor = min(self.x_cursor_ + n, self.max_size)
+            n = new_x_cursor - self.x_cursor_
             x = x[:n]
             if x.shape[0] > 0:
-                self.x[self.x_cursor:new_x_cursor] = x
-                self.distance[self.x_cursor:new_x_cursor, :self.y_cursor] = compute_distance(x, self.y[:self.y_cursor])
-                self.computations += self.y_cursor * n
-                if full:
-                    distance = self.distance[:new_x_cursor, :self.y_cursor]
-                else:
-                    distance = self.distance[self.x_cursor:new_x_cursor, :self.y_cursor]
-                if self.y_cursor == 0:
-                    if full:
+                self.x_[self.x_cursor_:new_x_cursor] = x
+                distance = compute_distance(x, self.y_[:self.y_cursor_])
+                self.computations_ += self.y_cursor_ * n
+                self.distance_[self.x_cursor_:new_x_cursor, :self.y_cursor_] = distance
+                if full_update:
+                    distance = self.distance_[:new_x_cursor, :self.y_cursor_]
+
+                if self.y_cursor_ == 0:  # Init
+                    if full_update:
                         f = np.zeros((new_x_cursor, 1))
                     else:
                         f = np.zeros((n, 1))
                 else:
-                    f = - logsumexp(self.q[:, :self.y_cursor] - distance, axis=1,
+                    f = - logsumexp(self.q_[:, :self.y_cursor_] - distance, axis=1,
                                     keepdims=True)
-                    self.computations += distance.shape[0] * distance.shape[1]
+                    self.computations_ += distance.shape[0] * distance.shape[1]
             else:
                 f = None
         else:
             f = None
-            new_x_cursor = self.x_cursor
+            new_x_cursor = self.x_cursor_
             n = None
         if y is not None:
             m = y.shape[0]
-            new_y_cursor = min(self.y_cursor + m, self.max_size)
-            m = new_y_cursor - self.y_cursor
+            new_y_cursor = min(self.y_cursor_ + m, self.max_size)
+            m = new_y_cursor - self.y_cursor_
             y = y[:m]
             if y.shape[0] > 0:
-                self.y[self.y_cursor:new_y_cursor] = y
-                self.distance[:self.x_cursor, self.y_cursor:new_y_cursor] = compute_distance(self.x[:self.x_cursor], y)
-                self.computations += self.x_cursor * m
-                if full:
-                    distance = self.distance[:self.x_cursor, :new_y_cursor]
-                else:
-                    distance = self.distance[:self.x_cursor, self.y_cursor:new_y_cursor]
-                if self.x_cursor == 0:
-                    if full:
+                self.y_[self.y_cursor_:new_y_cursor] = y
+                distance = compute_distance(self.x_[:self.x_cursor_], y)
+                self.computations_ += self.x_cursor_ * m
+                self.distance_[:self.x_cursor_, self.y_cursor_:new_y_cursor] = distance
+                if full_update:
+                    distance = self.distance_[:self.x_cursor_, :new_y_cursor]
+
+                if self.x_cursor_ == 0:
+                    if full_update:
                         g = np.zeros((1, new_y_cursor))
                     else:
                         g = np.zeros((1, m))
                 else:
-                    g = - logsumexp(self.p[:self.x_cursor, :] - distance, axis=0,
+                    g = - logsumexp(self.p_[:self.x_cursor_, :] - distance, axis=0,
                                     keepdims=True)
-                    self.computations += distance.shape[0] * distance.shape[1]
+                    self.computations_ += distance.shape[0] * distance.shape[1]
             else:
                 g = None
         else:
             g = None
-            new_y_cursor = self.y_cursor
+            new_y_cursor = self.y_cursor_
             m = None
         if x is not None and y is not None:
-            if step_size == 1:
-                new_x_cursor = n
-                new_y_cursor = m
-                self.distance[:new_x_cursor, :new_y_cursor] = compute_distance(x, y)
-            else:
-                self.distance[self.x_cursor:new_x_cursor, self.y_cursor:new_y_cursor] = compute_distance(x, y)
-            self.computations += n * m
+            self.distance_[self.x_cursor_:new_x_cursor, self.y_cursor_:new_y_cursor] = compute_distance(x, y)
+            self.computations_ += n * m
         if f is not None:
-            if full:
-                self.p[:new_x_cursor, :] = f - np.log(new_x_cursor)
+            if full_update:
+                self.p_[:new_x_cursor, :] = f - np.log(new_x_cursor)
             else:
-                if step_size == 1.:
-                    new_x_cursor = n
-                    self.p[:new_x_cursor, :] = f - np.log(n)
-                    self.x[:new_x_cursor] = x
+                if step_size == 1:
+                    self.p_[:self.x_cursor_, :] = - float('inf')
                 else:
-                    self.p[:self.x_cursor, :] += np.log(1 - step_size)
-                    self.p[self.x_cursor:new_x_cursor, :] = np.log(step_size) + f - np.log(n)
+                    self.p_[:self.x_cursor_, :] += np.log(1 - step_size)
+                self.p_[self.x_cursor_:new_x_cursor, :] = np.log(step_size) + f - np.log(n)
                 if self.averaging:
                     if avg_step_size == 1.:
-                        self.avg_p[:new_x_cursor] = self.p[:new_x_cursor]
+                        self.avg_p_[:new_x_cursor] = self.p_[:new_x_cursor]
                     else:
-                        self.avg_p[:new_x_cursor] = np.logaddexp(self.avg_p[:new_x_cursor] + math.log(1 - avg_step_size),
-                                                                 self.p[:new_x_cursor] + math.log(avg_step_size))
-            self.x_cursor = new_x_cursor
+                        self.avg_p_[:new_x_cursor] = np.logaddexp(
+                            self.avg_p_[:new_x_cursor] + np.log(1 - avg_step_size),
+                            self.p_[:new_x_cursor] + np.log(avg_step_size))
+            self.x_cursor_ = new_x_cursor
         if g is not None:
-            if full:
-                self.q[:, :new_y_cursor] = g - np.log(new_y_cursor)
+            if full_update:
+                self.q_[:, :new_y_cursor] = g - np.log(new_y_cursor)
             else:
-                if step_size == 1.:
-                    new_y_cursor = m
-                    self.q[:, :new_y_cursor] = g - np.log(m)
-                    self.y[:new_y_cursor] = y
+                if step_size == 1:
+                    self.q_[:, :self.y_cursor_] = - float('inf')
                 else:
-                    self.q[:, :self.y_cursor] += np.log(1 - step_size)
-                    self.q[:, self.y_cursor:new_y_cursor] = np.log(step_size) + g - np.log(m)
+                    self.q_[:, :self.y_cursor_] += np.log(1 - step_size)
+                self.q_[:, self.y_cursor_:new_y_cursor] = np.log(step_size) + g - np.log(m)
                 if self.averaging:
                     if avg_step_size == 1.:
-                        self.avg_q[:, :new_y_cursor] = self.q[:, :new_y_cursor]
+                        self.avg_q_[:, :new_y_cursor] = self.q_[:, :new_y_cursor]
                     else:
-                        self.avg_q[:, :new_y_cursor] = np.logaddexp(self.avg_q[:, :new_y_cursor] + math.log(1 - avg_step_size),
-                                                                    self.q[:, :new_y_cursor] + math.log(avg_step_size))
-            self.y_cursor = new_y_cursor
+                        self.avg_q_[:, :new_y_cursor] = np.logaddexp(
+                            self.avg_q_[:, :new_y_cursor] + np.log(1 - avg_step_size),
+                            self.q_[:, :new_y_cursor] + np.log(avg_step_size))
+            self.y_cursor_ = new_y_cursor
+        self.n_updates_ += 1
 
     def refit(self, *, refit_f=True, refit_g=True, step_size=1.):
-        self.computations += self.x_cursor * self.y_cursor
-        if self.x_cursor == 0 or self.y_cursor == 0:
+        if self.x_cursor_ == 0 or self.y_cursor_ == 0:
             return
         if refit_f:
             # shape (:self.x_cursor, 1)
-            f = - logsumexp(self.q[:, :self.y_cursor]
-                            - self.distance[:self.x_cursor, :self.y_cursor],
+            f = - logsumexp(self.q_[:, :self.y_cursor_]
+                            - self.distance_[:self.x_cursor_, :self.y_cursor_],
                             axis=1, keepdims=True)
-            self.computations += self.x_cursor * self.y_cursor
+            self.computations_ += self.x_cursor_ * self.y_cursor_
         else:
             f = None
         if refit_g:
             # shape (x_idx, 1)
-            g = - logsumexp(self.p[:self.x_cursor, :]
-                            - self.distance[:self.x_cursor, :self.y_cursor],
+            g = - logsumexp(self.p_[:self.x_cursor_, :]
+                            - self.distance_[:self.x_cursor_, :self.y_cursor_],
                             axis=0, keepdims=True)
-            self.computations += self.x_cursor * self.y_cursor
+            self.computations_ += self.x_cursor_ * self.y_cursor_
         else:
             g = None
 
         if refit_f:
             if step_size == 1:
-                self.p[:self.x_cursor, :] = f - np.log(self.x_cursor)
+                self.p_[:self.x_cursor_, :] = f - np.log(self.x_cursor_)
             else:
-                self.p[:self.x_cursor, :] = np.logaddexp(f - np.log(self.x_cursor) + np.log(step_size),
-                                                         self.p[:self.x_cursor] + np.log(1 - step_size))
+                self.p_[:self.x_cursor_, :] = np.logaddexp(f - np.log(self.x_cursor_) + np.log(step_size),
+                                                           self.p_[:self.x_cursor_] + np.log(1 - step_size))
         if refit_g:
             if step_size == 1:
-                self.q[:, :self.y_cursor] = g - np.log(self.y_cursor)
+                self.q_[:, :self.y_cursor_] = g - np.log(self.y_cursor_)
             else:
-                self.q[:self.x_cursor, :] = np.logaddexp(g - np.log(self.x_cursor) + np.log(step_size),
-                                                         self.q[:self.x_cursor] + np.log(1 - step_size))
+                self.q_[:, :self.y_cursor_] = np.logaddexp(g - np.log(self.x_cursor_) + np.log(step_size),
+                                                           self.q_[:self.x_cursor_] + np.log(1 - step_size))
+        self.n_updates_ += 1
 
     def compute_ot(self):
         if self.averaging:
-            q, p = self.avg_q, self.avg_p
+            q, p = self.avg_q_, self.avg_p_
         else:
-            q, p = self.q, self.p
-        distance = self.distance[:self.x_cursor, :self.y_cursor]
-        f = - logsumexp(q[:, :self.y_cursor] - distance, axis=1, keepdims=True)
-        g = - logsumexp(p[:self.x_cursor] - distance, axis=0, keepdims=True)
-        ff = - logsumexp(g - distance, axis=1, keepdims=True) + np.log(self.y_cursor)
-        gg = - logsumexp(f - distance, axis=0, keepdims=True) + np.log(self.x_cursor)
+            q, p = self.q_, self.p_
+        if self.no_memory:
+            distance = compute_distance(self.x_[:self.x_cursor_], self.y_[:self.y_cursor_])
+        else:
+            distance = self.distance_[:self.x_cursor_, :self.y_cursor_]
+        f = - logsumexp(q[:, :self.y_cursor_] - distance, axis=1, keepdims=True)
+        g = - logsumexp(p[:self.x_cursor_] - distance, axis=0, keepdims=True)
+        ff = - logsumexp(g - distance, axis=1, keepdims=True) + np.log(self.y_cursor_)
+        gg = - logsumexp(f - distance, axis=0, keepdims=True) + np.log(self.x_cursor_)
         return (f.mean() + ff.mean() + g.mean() + gg.mean()) / 2
 
     def evaluate_potential(self, *, x=None, y=None):
         if self.averaging:
-            q, p = self.avg_q, self.avg_p
+            q, p = self.avg_q_, self.avg_p_
         else:
-            q, p = self.q, self.p
+            q, p = self.q_, self.p_
         if x is not None:
-            distance = compute_distance(x, self.y[:self.y_cursor])
-            f = - logsumexp(q[:, :self.y_cursor] - distance, axis=1, keepdims=True)
+            distance = compute_distance(x, self.y_[:self.y_cursor_])
+            if self.y_cursor_ == 0:
+                f = np.zeros((x.shape[0], 1))
+            else:
+                f = - logsumexp(q[:, :self.y_cursor_] - distance, axis=1, keepdims=True)
         else:
             f = None
         if y is not None:
-            distance = compute_distance(self.x[:self.x_cursor], y)
-            g = - logsumexp(p[:self.x_cursor, :] - distance, axis=0, keepdims=True)
+            distance = compute_distance(self.x_[:self.x_cursor_], y)
+            if self.x_cursor_ == 0:
+                g = np.zeros((1, y.shape[0]))
+            else:
+                g = - logsumexp(p[:self.x_cursor_, :] - distance, axis=0, keepdims=True)
         else:
             g = None
         if f is not None and g is not None:
@@ -209,81 +271,143 @@ class OT:
         else:
             raise ValueError
 
-    @property
-    def full(self):
-        return self.x_cursor == self.max_size or self.y_cursor == self.max_size
+    def reset(self, x, y):
+        f, g = self.evaluate_potential(x=x, y=y)
+        distance = compute_distance(x, y)
+        self.computations_ += self.x_cursor_ * y.shape[0] + self.y_cursor_ * x.shape[0] + x.shape[0] * y.shape[0]
+        self.x_cursor_ = x.shape[0]
+        self.y_cursor_ = y.shape[0]
+        self.x_[:self.x_cursor_] = x
+        self.y_[:self.y_cursor_] = y
+        self.distance_[:self.x_cursor_, :self.y_cursor_] = distance
+        self.q_[:, :self.y_cursor_] = g - np.log(self.y_cursor_)
+        self.p_[:self.x_cursor_, :] = f - np.log(self.x_cursor_)
+
+        if self.averaging:
+            self.avg_q_[:, :self.y_cursor_] = self.q_[:, :self.y_cursor_]
+            self.avg_p_[:self.x_cursor_, :] = self.p_[:self.x_cursor_, :]
+
+        self.n_updates_ = 0
+
+    def online_sinkhorn_loop(self, x_sampler, y_sampler):
+        while not self.is_full:
+            if self.step_size_exp != 0:
+                step_size = self.step_size / np.float_power((self.n_updates_ + 1), self.step_size_exp)
+            else:
+                step_size = self.step_size
+            if self.avg_step_size != 0:
+                avg_step_size = self.avg_step_size / np.float_power((self.n_updates_ + 1), self.avg_step_size_exp)
+            else:
+                avg_step_size = self.avg_step_size
+            if self.batch_size_exp != 0:
+                batch_size = np.ceil(
+                    self.batch_size * np.float_power((self.n_updates_ + 1), self.batch_size_exp * 2)).astype(
+                    int)
+            else:
+                batch_size = self.batch_size
+
+            x, loga = x_sampler(batch_size)
+            y, logb = y_sampler(batch_size)
+            self.partial_fit(x=x, y=y, step_size=step_size, full_update=self.full_update, avg_step_size=avg_step_size)
+            self._callback()
+        return self
+
+    def random_sinkhorn_loop(self, x_sampler, y_sampler):
+        while self.n_updates_ < self.max_updates:
+            if self.batch_size_exp != 0:
+                batch_size = np.ceil(
+                    self.batch_size * np.float_power((self.n_updates_ + 1), self.batch_size_exp * 2)).astype(
+                    int)
+            else:
+                batch_size = self.batch_size
+
+            x, loga = x_sampler(batch_size)
+            y, logb = y_sampler(batch_size)
+            self.random_fit(x=x, y=y)
+            self._callback()
+        return self
+
+    def sinkhorn_loop(self):
+        while self.n_updates_ < self.max_updates:
+            if self.step_size_exp != 0:
+                step_size = self.step_size / np.float_power((self.n_updates_ + 1), self.step_size_exp)
+            else:
+                step_size = self.step_size
+            self.refit(refit_f=True, refit_g=True, step_size=step_size)
+            w = self.compute_ot()
+            self._callback()
+        return self
 
 
-def online_sinkhorn(x_sampler, y_sampler, A=1., B=10, a=1 / 2, b=1 / 2, full=False, max_size=1000, n_scale_iter=0,
-                    max_iter=None, full_A=1., full_a=0.,
-                    averaging=False, ref=None, name=None):
-    ot = OT(max_size=max_size, dimension=x_sampler.dim, averaging=averaging)
-    n_iter = 1.
-
+def sinkhorn(x, y, max_updates, ref=None, step_size=1., step_size_exp=0., ):
     if ref is not None:
-        trace = []
-
-    def eval_callback():
-        if ref is not None:
-            f, g = ot.evaluate_potential(x=ref['x'], y=ref['y'])
-            w = ot.compute_ot()
-            print(w)
-            var_err = var_norm(f - ref['f']) + var_norm(g - ref['g'])
-            w_err = np.abs(w - ref['w'])
-            trace.append(dict(computations=ot.computations, samples=ot.x_cursor + ot.y_cursor,
-                              iter=n_iter,
-                              var_err=var_err, w_err=w_err, n_iter=n_iter))
-
-    growing = (a > 0. or b > 0. or full)
-    if not growing:
-        assert max_iter is not None
-    if max_iter is None:
-        max_iter = float('inf')
-
-    while (growing and not ot.full) or (not growing and n_iter < max_iter):
-        if a != 0:
-            step_size = A / np.float_power(n_iter, a)
-        else:
-            step_size = A
-        avg_step_size = 1. / n_iter
-        if b != 0:
-            batch_size = np.ceil(B * np.float_power(n_iter, b * 2)).astype(int)
-        else:
-            batch_size = B
-
-        x, loga = x_sampler(batch_size)
-        y, logb = y_sampler(batch_size)
-        ot.partial_fit(x=x, y=y, step_size=step_size, full=full, avg_step_size=avg_step_size)
-        if n_iter % 10 == 0:
-            ot.refit(refit_f=True, refit_g=True, step_size=1.)
-        eval_callback()
-        n_iter += 1
-
-    for i in range(n_scale_iter):
-        if full_a != 0:
-            step_size = full_A / np.float_power(n_iter, full_a)
-        else:
-            step_size = full_A
-        ot.refit(refit_f=True, refit_g=True, step_size=step_size)
-        eval_callback()
-        n_iter += 1
-
-
-    if trace is not None:
-        return ot, trace
+        callback = Callback(ref)
     else:
-        return ot
+        callback = None
+    ot = OT(dimension=x.shape[1], max_updates=max_updates, callback=callback, max_size=x.shape[0],
+            step_size=step_size, step_size_exp=step_size_exp, averaging=False, no_memory=False)
+    ot.reset(x, y)
+    ot.sinkhorn_loop()
+    return ot
 
 
-def sinkhorn(x, y, n_iter=100):
-    ot = OT(max_size=10000, dimension=x.shape[1])
-    ot.partial_fit(x=x, y=y, step_size=1.)  # Fill the cost matrix
-    # print('sinkhorn', self.distance)
-    for i in range(n_iter):
-        ot.refit(refit_f=True, refit_g=True)
+def online_sinkhorn(x_sampler, y_sampler, max_size, ref=None, step_size=1., step_size_exp=0.,
+                    batch_size=1, batch_size_exp=0., avg_step_size=1., avg_step_size_exp=0., averaging=False,
+                    max_updates='auto', full_update=False, refine_updates=0):
+    if ref is not None:
+        callback = Callback(ref)
+    else:
+        callback = None
+    ot = OT(dimension=x_sampler.dim, max_updates=max_updates, callback=callback,
+            max_size=max_size,
+            step_size=step_size, step_size_exp=step_size_exp,
+            batch_size=batch_size, batch_size_exp=batch_size_exp, avg_step_size=avg_step_size,
+            avg_step_size_exp=avg_step_size_exp, averaging=averaging,
+            full_update=full_update,
+            )
+    ot.online_sinkhorn_loop(x_sampler, y_sampler)
+    if refine_updates > 0:
+        ot.set_params(max_updates=refine_updates, step_size=1., step_size_exp=0.,
+                      averaging=False)
+        ot.sinkhorn_loop()
+    return ot
+
+
+def random_sinkhorn(x_sampler, y_sampler, max_size, ref=None, step_size=1., step_size_exp=0.,
+                    batch_size=1, batch_size_exp=0., averaging=False,
+                    max_updates='auto', full_update=False, refine_updates=0):
+    if ref is not None:
+        callback = Callback(ref)
+    else:
+        callback = None
+    ot = OT(dimension=x_sampler.dim, max_updates=max_updates, callback=callback,
+            max_size=max_size,
+            step_size=step_size, step_size_exp=step_size_exp, no_memory=no_memory,
+            batch_size=batch_size, batch_size_exp=batch_size_exp, avg_step_size=avg_step_size,
+            avg_step_size_exp=avg_step_size_exp, averaging=averaging,
+            full_update=full_update,
+            )
+    ot.online_sinkhorn_loop(x_sampler, y_sampler)
+    if refine_updates > 0:
+        ot.set_params(max_updates=refine_updates, step_size=1., step_size_exp=0.,
+                      averaging=False)
+        ot.sinkhorn_loop()
+    return ot
+
+
+class Callback():
+    def __init__(self, ref):
+        self.trace = []
+        self.ref = ref
+
+    def __call__(self, ot):
+        f, g = ot.evaluate_potential(x=self.ref['x'], y=self.ref['y'])
         w = ot.compute_ot()
-    f, g = ot.evaluate_potential(x=x, y=y)
-    return (f, g), w
+        var_err = var_norm(f - self.ref['f']) + var_norm(g - self.ref['g'])
+        w_err = np.abs(w - self.ref['w'])
+        self.trace.append(dict(computations=ot.computations_, samples=ot.x_cursor_ + ot.y_cursor_,
+                               iter=ot.n_updates_,
+                               var_err=var_err, w_err=w_err, n_updates=ot.n_updates_))
 
 
 def var_norm(x):
@@ -294,62 +418,45 @@ def run_OT():
     np.random.seed(0)
 
     n = 50
-    n_ref_iter = 100
+    ref_updates = 1000
 
-    x = np.random.randn(n, 5) / 10
-    y = np.random.randn(n, 5) / 10 + 10
+    x = np.random.randn(n, 5)
+    y = np.random.randn(n, 5) + 10
 
     mem = Memory(location=None)
 
-    (f, g), w = mem.cache(sinkhorn)(x, y, n_ref_iter)
+    ot = mem.cache(sinkhorn)(x, y, ref_updates)
+    f, g = ot.evaluate_potential(x=x, y=y)
+    w = ot.compute_ot()
     ref = dict(f=f, g=g, x=x, y=y, w=w)
 
     x_sampler = Subsampler(x)
     y_sampler = Subsampler(y)
-    n_scale_iter = 0
-    max_size = n * 1000
-    configs = [
-               # dict(a=0.0, b=0., B=n, A=1., full=False, max_size=n * 100, n_scale_iter=0, name="Sinkhorn slowed"),
-               # dict(a=0.0, b=0., B=n, A=1, full=False, max_size=n * 100, n_scale_iter=0, name="Sinkhorn slowed 0.9"),
-               # dict(a=0.0, b=0., B=n, A=1, full=False, max_size=n, n_scale_iter=n_ref_iter, name="Sinkhorn"),
-               # dict(a=0.2, b=0., B=n, A=1, full=False, max_size=n * 100, n_scale_iter=0, name="Sinkhorn 0.2"),
-               # dict(a=0.8, b=0., B=n, A=1, full=False, max_size=n * 100, n_scale_iter=0, name="Sinkhorn 0.8"),
-               dict(a=0.0, b=0., B=10, A=1, full=False, max_size=2 * n, max_iter=100, n_scale_iter=0, name="Randomized Sinkhorn"),
-               dict(a=0.0, b=0., B=50, A=1, full=False, max_size=2 * n, max_iter=100, n_scale_iter=0, name="Full Randomized Sinkhorn"),
-               # dict(a=0.0, b=0., B=n, A=1, full=False, max_size=n, n_scale_iter=100, full_a=0.0, full_A=1.,
-               #      name="Sinkhorn 0.0 (fast)"),
-               # dict(a=0.0, b=0., B=n, A=1, full=False, max_size=n, n_scale_iter=100, full_a=0.01, full_A=1.,
-               #      name="Sinkhorn 0.01 (fast)"),
-               ]
-    # configs = [
-    #            dict(a=0., b=0., B=10, A=1, full=False, max_size=10, n_scale_iter=n_ref_iter, name="Partial Sinkhorn"),
-    #            # dict(a=0., b=0., B=10, A=1, full=False, max_size=max_size, n_scale_iter=n_scale_iter,
-    #            #      name="Randomized Sinkhorn"),
-    #            # dict(a=0., b=1., B=10, A=1, full=False, max_size=max_size, n_scale_iter=n_scale_iter,
-    #            #      name="Randomized Sinkhorn + growing batch"),
-    #            # dict(a=0., b=0., B=10, A=1, full=False, max_size=max_size, n_scale_iter=n_scale_iter,
-    #            #      averaging=True,
-    #            #      name="Randomized Sinkhorn + averaging"),
-    #            dict(a=0., b=1., B=10, A=1, full=True, max_size=max_size, n_scale_iter=n_scale_iter,
-    #                 name="Full-refit randomized Sinkhorn"),
-    #            # dict(a=1., b=0.1, B=10, A=1, full=False, max_size=max_size, n_scale_iter=n_scale_iter,
-    #            #      name="Online Sinkhorn 1/n"),
-    #            # dict(a=1. / 2, b=1/2, B=10, A=1, full=False, max_size=max_size, n_scale_iter=n_scale_iter,
-    #            #      name="Online Sinkhorn 1/sqrt(n)"),
-    #            dict(a=1/2, b=1, B=10, A=1, full=False, max_size=max_size, n_scale_iter=n_scale_iter,
-    #                 name="Online Sinkhorn 1/sqrt(n) + averaging", averaging=False),
-    #            dict(a=1. / 2, b=1 / 2, B=10, A=1, full=True, max_size=max_size, n_scale_iter=n_scale_iter,
-    #                 name="Online full-refit Sinkhorn")
-    #                      ]
 
-    traces = Parallel(n_jobs=5)(delayed(mem.cache(online_sinkhorn, ignore=['name']))
-                                (x_sampler, y_sampler, ref=ref, **config)
-                                for config in configs)
+    jobs = []
+    # for step_size, step_size_exp in [(1., 0.)]:
+    #     jobs.append((f'Sinkhorn s={step_size}/t^{step_size_exp}',
+    #                  delayed(mem.cache(sinkhorn))(x, y, ref=ref, step_size=step_size, step_size_exp=step_size_exp,
+    #                                               max_updates=ref_updates)))
+    jobs.append(
+        ('Random Sinkhorn', delayed(mem.cache(online_sinkhorn))(x_sampler, y_sampler, ref=ref, max_size=10,
+                                                                full_update=False, step_size=1., step_size_exp=0.,
+                                                                max_updates=n * 10, batch_size=10, no_memory=True)))
+    # for (step_size_exp, batch_size_exp) in ([1, 0.], [.5, .5], [0., 1.], [.5, 1], [.5, 1]):
+    #     jobs.append(
+    #         (f'Online Sinhkorn s=1/t^{step_size_exp} b=10 t^{2 * batch_size_exp}',
+    #          delayed(mem.cache(online_sinkhorn))(x_sampler, y_sampler, max_size=n * 10,
+    #                                              ref=ref, max_updates='auto',
+    #                                              full_update=False, step_size=1.,
+    #                                              step_size_exp=step_size_exp,
+    #                                              batch_size=10, batch_size_exp=batch_size_exp,
+    #                                              no_memory=False)))
+    traces = Parallel(n_jobs=5)(job for (name, job) in jobs)
     dfs = []
-    for (ot, trace), config in zip(traces, configs):
+    for ot, (name, job) in zip(traces, jobs):
+        trace = ot.callback.trace
         df = pd.DataFrame(trace)
-        for key, value in config.items():
-            df[key] = value
+        df['name'] = name
         dfs.append(df)
     dfs = pd.concat(dfs, axis=0)
     dfs.to_pickle('results.pkl')
