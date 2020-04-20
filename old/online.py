@@ -767,8 +767,8 @@ def simple():
 
 
 def plot():
-    # results = joblib.load(expanduser('~/output/online_sinkhorn/results_1e6_2.pkl'))
-    # results = joblib.load(expanduser('~/output/online_sinkhorn/results_1e5.pkl'))
+    # results = joblib.load(expanduser('~/output/onlikhorn/results_1e6_2.pkl'))
+    # results = joblib.load(expanduser('~/output/onlikhorn/results_1e5.pkl'))
     results = joblib.load(expanduser('~/output/online_sinkhorn/results_from_ref.pkl'))
     df = []
     for result in results:

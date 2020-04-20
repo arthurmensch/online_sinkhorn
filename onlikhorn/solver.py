@@ -1,13 +1,7 @@
-from os.path import expanduser
-from typing import Union
+from typing import Union, Tuple
 
-import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
-from joblib import Parallel, Memory, delayed
 from scipy.special import logsumexp
-
-from online_sinkhorn.data import Subsampler
 
 
 def compute_distance(x, y):
@@ -17,7 +11,7 @@ def compute_distance(x, y):
 
 
 class OT:
-    def __init__(self, max_size, dimension, callback=None, step_size=1., step_size_exp=0.,
+    def __init__(self, max_size: Tuple[int, int], dimension, callback=None, step_size=1., step_size_exp=0.,
                  batch_size=1, batch_size_exp=0., avg_step_size=1., avg_step_size_exp=0.,
                  no_memory=False, full_update=False, max_updates: Union[str, int] = 'auto', averaging=False):
         self.max_size = max_size
@@ -39,15 +33,15 @@ class OT:
             raise NotImplementedError
 
         # Attributes
-        self.distance_ = np.zeros((max_size, max_size))
-        self.x_ = np.empty((max_size, dimension))
-        self.p_ = np.full((max_size, 1), fill_value=-np.float('inf'))
-        self.y_ = np.empty((max_size, dimension))
-        self.q_ = np.full((1, max_size), fill_value=-np.float('inf'))
+        self.distance_ = np.zeros(max_size)
+        self.x_ = np.empty((max_size[0], dimension))
+        self.p_ = np.full((max_size[0], 1), fill_value=-np.float('inf'))
+        self.y_ = np.empty((max_size[1], dimension))
+        self.q_ = np.full((1, max_size[1]), fill_value=-np.float('inf'))
 
         if self.averaging:
-            self.avg_p_ = np.full((max_size, 1), fill_value=-np.float('inf'))
-            self.avg_q_ = np.full((1, max_size), fill_value=-np.float('inf'))
+            self.avg_p_ = np.full((max_size[0], 1), fill_value=-np.float('inf'))
+            self.avg_q_ = np.full((1, max_size[1]), fill_value=-np.float('inf'))
 
         self.x_cursor_ = 0
         self.y_cursor_ = 0
@@ -64,7 +58,7 @@ class OT:
 
     @property
     def is_full(self):
-        return self.x_cursor_ == self.max_size or self.y_cursor_ == self.max_size
+        return self.x_cursor_ == self.max_size[0] and self.y_cursor_ == self.max_size[1]
 
     def random_fit(self, *, x=None, y=None):
         if x is None and y is None:
@@ -99,7 +93,7 @@ class OT:
 
         if x is not None:
             n = x.shape[0]
-            new_x_cursor = min(self.x_cursor_ + n, self.max_size)
+            new_x_cursor = min(self.x_cursor_ + n, self.max_size[0])
             n = new_x_cursor - self.x_cursor_
             x = x[:n]
             if x.shape[0] > 0:
@@ -127,7 +121,7 @@ class OT:
             n = None
         if y is not None:
             m = y.shape[0]
-            new_y_cursor = min(self.y_cursor_ + m, self.max_size)
+            new_y_cursor = min(self.y_cursor_ + m, self.max_size[1])
             m = new_y_cursor - self.y_cursor_
             y = y[:m]
             if y.shape[0] > 0:
@@ -345,7 +339,7 @@ def sinkhorn(x, y, max_updates, ref=None, step_size=1., step_size_exp=0., ):
         callback = Callback(ref)
     else:
         callback = None
-    ot = OT(dimension=x.shape[1], max_updates=max_updates, callback=callback, max_size=x.shape[0],
+    ot = OT(dimension=x.shape[1], max_updates=max_updates, callback=callback, max_size=(x.shape[0], y.shape[0]),
             step_size=step_size, step_size_exp=step_size_exp, averaging=False, no_memory=False)
     ot._callback()
     ot.reset(x, y)
@@ -413,90 +407,3 @@ class Callback():
 
 def var_norm(x):
     return np.max(x) - np.min(x)
-
-
-def run_OT():
-    np.random.seed(0)
-
-    n = 1000
-    ref_updates = 100
-
-    x = np.random.randn(n, 5)
-    y = np.random.randn(n, 5) + 10
-
-    mem = Memory(location=None)
-
-    ot = mem.cache(sinkhorn)(x, y, ref_updates)
-    f, g = ot.evaluate_potential(x=x, y=y)
-    w = ot.compute_ot()
-    ref = dict(f=f, g=g, x=x, y=y, w=w)
-
-    x_sampler = Subsampler(x)
-    y_sampler = Subsampler(y)
-
-    jobs = []
-    for step_size, step_size_exp in [(1., 0.)]:
-        jobs.append((f'Sinkhorn s={step_size}/t^{step_size_exp}',
-                     delayed(mem.cache(sinkhorn))(x, y, ref=ref, step_size=step_size, step_size_exp=step_size_exp,
-                                                  max_updates=ref_updates)))
-    # jobs.append(
-    #     ('Random Sinkhorn', delayed(mem.cache(online_sinkhorn))(x_sampler, y_sampler, ref=ref, max_size=10,
-    #                                                             full_update=False, step_size=1., step_size_exp=0.,
-    #                                                             max_updates=n * 10, batch_size=10, no_memory=True)))
-    for batch_size in [10, 100]:
-        jobs.append(
-            (f'Online Sinhkorn s=1/t^{1/2} b={batch_size}',
-             delayed(mem.cache(online_sinkhorn))(x_sampler, y_sampler, max_size=n,
-                                                 refine_updates=100,
-                                                 ref=ref,
-                                                 full_update=False, step_size=1,
-                                                 step_size_exp=1/2,
-                                                 batch_size=batch_size, batch_size_exp=0,
-                                                 )))
-    # for (step_size_exp, batch_size_exp) in ([1, 0.], [.5, .5], [0., 1.], [.5, 1], [.5, 1]):
-    #     jobs.append(
-    #         (f'Online Sinhkorn s=1/t^{step_size_exp} b=10 t^{2 * batch_size_exp}',
-    #          delayed(mem.cache(online_sinkhorn))(x_sampler, y_sampler, max_size=n * 10,
-    #                                              ref=ref, max_updates='auto',
-    #                                              full_update=False, step_size=1.,
-    #                                              step_size_exp=step_size_exp,
-    #                                              batch_size=10, batch_size_exp=batch_size_exp,
-    #                                              no_memory=False)))
-    traces = Parallel(n_jobs=5)(job for (name, job) in jobs)
-    dfs = []
-    for ot, (name, job) in zip(traces, jobs):
-        trace = ot.callback.trace
-        df = pd.DataFrame(trace)
-        df['name'] = name
-        dfs.append(df)
-    dfs = pd.concat(dfs, axis=0)
-    dfs.to_pickle('results_warmstart.pkl')
-
-
-def plot_results():
-    df = pd.read_pickle('results_warmstart.pkl')
-    fig, axes = plt.subplots(2, 3, figsize=(15, 10), sharex='col', sharey='row')
-    for name, sub_df in df.groupby(by='name'):
-        axes[0][0].plot(sub_df['computations'], sub_df['w_err'], label=name)
-        axes[1][0].plot(sub_df['computations'], sub_df['var_err'], label=name)
-        axes[0][2].plot(sub_df['iter'], sub_df['w_err'], label=name)
-        axes[1][2].plot(sub_df['iter'], sub_df['var_err'], label=name)
-        axes[0][1].plot(sub_df['samples'], sub_df['w_err'], label=name)
-        axes[1][1].plot(sub_df['samples'], sub_df['var_err'], label=name)
-    for ax in axes.ravel():
-        ax.set_yscale('log')
-        ax.set_xscale('log')
-    axes[1][0].set_xlabel('Computations')
-    axes[1][1].set_xlabel('Samples')
-    axes[1][2].set_xlabel('Iteration')
-    axes[0][0].set_ylabel('W err')
-    axes[1][0].set_ylabel('Var err')
-    # axes[0][0].set_ylim([1e-3, 1e2])
-    # axes[1][0].set_ylim([1, 1e2])
-    axes[1][1].legend()
-    plt.show()
-
-
-if __name__ == '__main__':
-    run_OT()
-    plot_results()

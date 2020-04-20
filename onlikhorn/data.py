@@ -1,5 +1,7 @@
 import numpy as np
 
+from onlikhorn.dataset import get_dragon, create_sphere
+
 
 class Subsampler:
     def __init__(self, x):
@@ -51,7 +53,7 @@ class Sampler:
                                                           [diff, self.icov, diff]) / 2) / self.norm, axis=1)
 
 
-def make_data_1d(n, m):
+def make_gmm_1d(n, m):
     x_sampler = Sampler(mean=np.array([[1.], [2], [3]]), cov=np.array([[[.1]], [[.1]], [[.1]]]),
                         p=np.ones(3) / 3)
     y_sampler = Sampler(mean=np.array([[0.], [3], [5]]), cov=np.array([[[.1]], [[.1]], [[.4]]]),
@@ -59,4 +61,20 @@ def make_data_1d(n, m):
 
     x, loga = x_sampler(n)
     y, logb = y_sampler(m)
-    return x, loga, y, logb
+    return (x, loga), (y, logb)
+
+
+def make_random_5d(n, m):
+    x = np.random.randn(n, 5)
+    y = np.random.randn(m, 5) + 10
+    loga = np.full((x.shape[0], ), fill_value=-np.log(x.shape[0]))
+    logb = np.full((y.shape[0], ), fill_value=-np.log(y.shape[0]))
+    return (x, loga), (y, logb)
+
+
+def get_cloud_3d(data_dir=None):
+    a, x = get_dragon(data_dir)
+    b, y = create_sphere(int(1e4))
+    loga = np.full((x.shape[0], ), fill_value=-np.log(x.shape[0]))
+    logb = np.full((y.shape[0], ), fill_value=-np.log(y.shape[0]))
+    return (x, loga), (y, logb)
