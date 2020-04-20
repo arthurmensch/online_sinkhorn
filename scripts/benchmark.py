@@ -20,8 +20,8 @@ def run_OT(source):
         (x, _), (y, _) = make_random_5d(1000, 2000)
     elif source == 'cloud_3d':
         (x, _), (y, _) = get_cloud_3d()
-        x = x[::10][:1100]  # we do not handle gracefully batches that are not full FIXME
-        y = y[::10][:1000]
+        x = x[:11000]  # we do not handle gracefully batches that are not full FIXME
+        y = y[:10000]
 
     epsilon = 1e-2
 
