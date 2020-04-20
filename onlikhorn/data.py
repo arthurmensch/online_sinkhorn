@@ -4,22 +4,30 @@ from onlikhorn.dataset import get_dragon, create_sphere
 
 
 class Subsampler:
-    def __init__(self, x):
+    def __init__(self, x, cycle=True, small_last=True):
         self.x = np.array(x, copy=True)
         np.random.shuffle(self.x)
         self.dim = x.shape[1]
         self.cursor = 0
+        self.cycle = cycle
+        self.small_last = small_last
 
     def __call__(self, n):
-        new_cursor = min(len(self.x), self.cursor + n)
-        x = np.array(self.x[self.cursor:new_cursor], copy=True)
-        if new_cursor == len(self.x):
-            np.random.shuffle(self.x)
-            self.cursor = (self.cursor + n) % len(self.x)
-            self.cursor = (self.cursor + n) % len(self.x)
-            x = np.concatenate([x, self.x[:self.cursor]], axis=0)
+        if not self.cycle:
+            x = self.x[np.random.permutation(len(self.x))[:n]]
         else:
-            self.cursor = new_cursor
+            new_cursor = min(len(self.x), self.cursor + n)
+            x = np.array(self.x[self.cursor:new_cursor], copy=True)
+            if new_cursor == len(self.x):
+                np.random.shuffle(self.x)
+                if self.small_last:
+                    self.cursor = 0
+                else:
+                    self.cursor = (self.cursor + n) % len(self.x)
+                    x = np.concatenate([x, self.x[:self.cursor]], axis=0)
+            else:
+                self.cursor = new_cursor
+        n = len(x)
         return x, np.full((n, ), fill_value=-np.log(n))
 
 
