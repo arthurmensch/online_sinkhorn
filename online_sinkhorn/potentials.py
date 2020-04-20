@@ -59,7 +59,7 @@ class OT:
             self.callback(self)
 
     def set_params(self, **params):
-        for key, value in params:
+        for key, value in params.items():
             self.__setattr__(key, value)
 
     @property
@@ -227,6 +227,8 @@ class OT:
         self.n_updates_ += 1
 
     def compute_ot(self):
+        if self.x_cursor_ == 0 or self.y_cursor_ == 0:
+            return 0
         if self.averaging:
             q, p = self.avg_q_, self.avg_p_
         else:
@@ -247,18 +249,18 @@ class OT:
         else:
             q, p = self.q_, self.p_
         if x is not None:
-            distance = compute_distance(x, self.y_[:self.y_cursor_])
             if self.y_cursor_ == 0:
                 f = np.zeros((x.shape[0], 1))
             else:
+                distance = compute_distance(x, self.y_[:self.y_cursor_])
                 f = - logsumexp(q[:, :self.y_cursor_] - distance, axis=1, keepdims=True)
         else:
             f = None
         if y is not None:
-            distance = compute_distance(self.x_[:self.x_cursor_], y)
             if self.x_cursor_ == 0:
                 g = np.zeros((1, y.shape[0]))
             else:
+                distance = compute_distance(self.x_[:self.x_cursor_], y)
                 g = - logsumexp(p[:self.x_cursor_, :] - distance, axis=0, keepdims=True)
         else:
             g = None
@@ -291,6 +293,7 @@ class OT:
 
     def online_sinkhorn_loop(self, x_sampler, y_sampler):
         while not self.is_full:
+            self._callback()
             if self.step_size_exp != 0:
                 step_size = self.step_size / np.float_power((self.n_updates_ + 1), self.step_size_exp)
             else:
@@ -309,11 +312,11 @@ class OT:
             x, loga = x_sampler(batch_size)
             y, logb = y_sampler(batch_size)
             self.partial_fit(x=x, y=y, step_size=step_size, full_update=self.full_update, avg_step_size=avg_step_size)
-            self._callback()
         return self
 
     def random_sinkhorn_loop(self, x_sampler, y_sampler):
         while self.n_updates_ < self.max_updates and not self.is_full:
+            self._callback()
             if self.batch_size_exp != 0.:
                 batch_size = np.ceil(
                     self.batch_size * np.float_power((self.n_updates_ + 1), self.batch_size_exp * 2)).astype(
@@ -324,18 +327,16 @@ class OT:
             x, loga = x_sampler(batch_size)
             y, logb = y_sampler(batch_size)
             self.random_fit(x=x, y=y)
-            self._callback()
         return self
 
     def sinkhorn_loop(self):
         while self.n_updates_ < self.max_updates:
+            self._callback()
             if self.step_size_exp != 0:
                 step_size = self.step_size / np.float_power((self.n_updates_ + 1), self.step_size_exp)
             else:
                 step_size = self.step_size
             self.refit(refit_f=True, refit_g=True, step_size=step_size)
-            w = self.compute_ot()
-            self._callback()
         return self
 
 
@@ -346,6 +347,7 @@ def sinkhorn(x, y, max_updates, ref=None, step_size=1., step_size_exp=0., ):
         callback = None
     ot = OT(dimension=x.shape[1], max_updates=max_updates, callback=callback, max_size=x.shape[0],
             step_size=step_size, step_size_exp=step_size_exp, averaging=False, no_memory=False)
+    ot._callback()
     ot.reset(x, y)
     ot.sinkhorn_loop()
     return ot
@@ -353,7 +355,7 @@ def sinkhorn(x, y, max_updates, ref=None, step_size=1., step_size_exp=0., ):
 
 def online_sinkhorn(x_sampler, y_sampler, max_size, ref=None, step_size=1., step_size_exp=0.,
                     batch_size=1, batch_size_exp=0., avg_step_size=1., avg_step_size_exp=0., averaging=False,
-                    max_updates='auto', full_update=False, refine_updates=0):
+                    max_updates=None, full_update=False, refine_updates=0):
     if ref is not None:
         callback = Callback(ref)
     else:
@@ -365,9 +367,10 @@ def online_sinkhorn(x_sampler, y_sampler, max_size, ref=None, step_size=1., step
             avg_step_size_exp=avg_step_size_exp, averaging=averaging,
             full_update=full_update,
             )
+    ot._callback()
     ot.online_sinkhorn_loop(x_sampler, y_sampler)
     if refine_updates > 0:
-        ot.set_params(max_updates=refine_updates, step_size=1., step_size_exp=0.,
+        ot.set_params(max_updates=refine_updates + ot.n_updates_, step_size=1., step_size_exp=0.,
                       averaging=False)
         ot.sinkhorn_loop()
     return ot
@@ -415,8 +418,8 @@ def var_norm(x):
 def run_OT():
     np.random.seed(0)
 
-    n = 50
-    ref_updates = 1000
+    n = 1000
+    ref_updates = 100
 
     x = np.random.randn(n, 5)
     y = np.random.randn(n, 5) + 10
@@ -432,14 +435,24 @@ def run_OT():
     y_sampler = Subsampler(y)
 
     jobs = []
-    # for step_size, step_size_exp in [(1., 0.)]:
-    #     jobs.append((f'Sinkhorn s={step_size}/t^{step_size_exp}',
-    #                  delayed(mem.cache(sinkhorn))(x, y, ref=ref, step_size=step_size, step_size_exp=step_size_exp,
-    #                                               max_updates=ref_updates)))
-    jobs.append(
-        ('Random Sinkhorn', delayed(mem.cache(online_sinkhorn))(x_sampler, y_sampler, ref=ref, max_size=10,
-                                                                full_update=False, step_size=1., step_size_exp=0.,
-                                                                max_updates=n * 10, batch_size=10, no_memory=True)))
+    for step_size, step_size_exp in [(1., 0.)]:
+        jobs.append((f'Sinkhorn s={step_size}/t^{step_size_exp}',
+                     delayed(mem.cache(sinkhorn))(x, y, ref=ref, step_size=step_size, step_size_exp=step_size_exp,
+                                                  max_updates=ref_updates)))
+    # jobs.append(
+    #     ('Random Sinkhorn', delayed(mem.cache(online_sinkhorn))(x_sampler, y_sampler, ref=ref, max_size=10,
+    #                                                             full_update=False, step_size=1., step_size_exp=0.,
+    #                                                             max_updates=n * 10, batch_size=10, no_memory=True)))
+    for batch_size in [10, 100]:
+        jobs.append(
+            (f'Online Sinhkorn s=1/t^{1/2} b={batch_size}',
+             delayed(mem.cache(online_sinkhorn))(x_sampler, y_sampler, max_size=n,
+                                                 refine_updates=100,
+                                                 ref=ref,
+                                                 full_update=False, step_size=1,
+                                                 step_size_exp=1/2,
+                                                 batch_size=batch_size, batch_size_exp=0,
+                                                 )))
     # for (step_size_exp, batch_size_exp) in ([1, 0.], [.5, .5], [0., 1.], [.5, 1], [.5, 1]):
     #     jobs.append(
     #         (f'Online Sinhkorn s=1/t^{step_size_exp} b=10 t^{2 * batch_size_exp}',
@@ -457,12 +470,12 @@ def run_OT():
         df['name'] = name
         dfs.append(df)
     dfs = pd.concat(dfs, axis=0)
-    dfs.to_pickle('results.pkl')
+    dfs.to_pickle('results_warmstart.pkl')
 
 
 def plot_results():
-    df = pd.read_pickle('results.pkl')
-    fig, axes = plt.subplots(2, 3, sharex='col', sharey='row')
+    df = pd.read_pickle('results_warmstart.pkl')
+    fig, axes = plt.subplots(2, 3, figsize=(15, 10), sharex='col', sharey='row')
     for name, sub_df in df.groupby(by='name'):
         axes[0][0].plot(sub_df['computations'], sub_df['w_err'], label=name)
         axes[1][0].plot(sub_df['computations'], sub_df['var_err'], label=name)
