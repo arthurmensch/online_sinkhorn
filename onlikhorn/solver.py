@@ -107,7 +107,7 @@ class OT:
             if x.shape[0] > 0:
                 self.x_[self.x_cursor_:new_x_cursor] = x
                 distance = compute_distance(x, self.y_[:self.y_cursor_])
-                self.computations_ += self.y_cursor_ * n * x.shape[1]
+                self.computations_ += self.y_cursor_ * n * x.shape[1]  # save distance matrix
                 self.distance_[self.x_cursor_:new_x_cursor, :self.y_cursor_] = distance
                 if full_update:
                     distance = self.distance_[:new_x_cursor, :self.y_cursor_]
@@ -241,10 +241,10 @@ class OT:
             distance = self.distance_[:self.x_cursor_, :self.y_cursor_]
         f = - self.scaled_logsumexp(q[:, :self.y_cursor_] - distance, axis=1, keepdims=True)
         g = - self.scaled_logsumexp(p[:self.x_cursor_] - distance, axis=0, keepdims=True)
-        return f.mean() + g.mean()
-        # ff = - self.scaled_logsumexp(g - distance, axis=1, keepdims=True) + np.log(self.y_cursor_)
-        # gg = - self.scaled_logsumexp(f - distance, axis=0, keepdims=True) + np.log(self.x_cursor_)
-        # return (f.mean() + ff.mean() + g.mean() + gg.mean()) / 2
+        # return f.mean() + g.mean()
+        ff = - self.scaled_logsumexp(g - distance, axis=1, keepdims=True) + np.log(self.y_cursor_)
+        gg = - self.scaled_logsumexp(f - distance, axis=0, keepdims=True) + np.log(self.x_cursor_)
+        return (f.mean() + ff.mean() + g.mean() + gg.mean()) / 2
 
     def evaluate_potential(self, *, x=None, y=None):
         if self.averaging:
@@ -277,7 +277,6 @@ class OT:
             raise ValueError
 
     def reset(self, x, y):
-        self._callback()
         f, g = self.evaluate_potential(x=x, y=y)
         distance = compute_distance(x, y)
         self.computations_ += self.x_cursor_ * y.shape[0] + self.y_cursor_ * x.shape[0]
@@ -293,8 +292,6 @@ class OT:
         if self.averaging:
             self.avg_q_[:, :self.y_cursor_] = self.q_[:, :self.y_cursor_]
             self.avg_p_[:self.x_cursor_, :] = self.p_[:self.x_cursor_, :]
-
-        # self.n_updates_ += 2
 
     def online_sinkhorn_loop(self, x_sampler, y_sampler):
         while not self.is_full:
@@ -405,8 +402,7 @@ class Callback():
 
     def __call__(self, ot):
         w = ot.compute_ot()
-        print(f'Computations: {ot.computations_}, updates: {ot.n_updates_}, ot {w}')
-        if self.ref is not None:
+        if self.ref is not None and ot.computations_ > 0:
             f, g = ot.evaluate_potential(x=self.ref['x'], y=self.ref['y'])
             var_err = var_norm(f - self.ref['f']) + var_norm(g - self.ref['g'])
             w_err = np.abs(w - self.ref['w'])
@@ -416,7 +412,10 @@ class Callback():
             self.trace.append(dict(computations=ot.computations_, samples=ot.x_cursor_ + ot.y_cursor_,
                                    iter=ot.n_updates_, w=w, w_rel=w_rel, var_rel=var_rel,
                                    var_err=var_err, w_err=w_err, n_updates=ot.n_updates_))
+            print(f'Computations: {ot.computations_}, updates: {ot.n_updates_}, ot {w} w_err={w_err},'
+                  f' var_err={var_err}')
         else:
+            print(f'Computations: {ot.computations_}, updates: {ot.n_updates_}, ot {w}')
             self.trace.append(dict(computations=ot.computations_, samples=ot.x_cursor_ + ot.y_cursor_,
                                    iter=ot.n_updates_, w=w,
                                    n_updates=ot.n_updates_))
