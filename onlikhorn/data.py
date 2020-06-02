@@ -4,13 +4,16 @@ from onlikhorn.dataset import get_dragon, create_sphere
 
 
 class Subsampler:
-    def __init__(self, x, cycle=True, small_last=True):
-        self.x = np.array(x, copy=True)
+    def __init__(self, x=None, size=None, cycle=True, small_last=False, return_idx=False):
+        if return_idx:
+            self.x = np.arange(size, dtype=np.long)
+        else:
+            self.x = np.array(x, copy=True)
         np.random.shuffle(self.x)
-        self.dim = x.shape[1]
         self.cursor = 0
         self.cycle = cycle
         self.small_last = small_last
+        self.return_idx = False
 
     def __call__(self, n):
         if not self.cycle:
@@ -29,7 +32,6 @@ class Subsampler:
                 self.cursor = new_cursor
         n = len(x)
         return x, np.full((n, ), fill_value=-np.log(n))
-
 
 class Sampler:
     def __init__(self, mean, cov, p):
@@ -66,6 +68,19 @@ def make_gmm_1d(n, m):
                         p=np.ones(3) / 3)
     y_sampler = Sampler(mean=np.array([[0.], [3], [5]]), cov=np.array([[[.1]], [[.1]], [[.4]]]),
                         p=np.ones(3) / 3)
+
+    x, loga = x_sampler(n)
+    y, logb = y_sampler(m)
+    return (x, loga), (y, logb)
+
+def make_gmm(n, m, d, modes):
+    means_x = np.random.rand(modes, d)
+    means_y = np.random.rand(modes, d)
+    cov = np.repeat(np.eye(d)[None, :, :], modes, axis=0) * 1e-1
+    x_sampler = Sampler(mean=means_x, cov=cov,
+                        p=np.full(modes, fill_value=1/modes))
+    y_sampler = Sampler(mean=means_y, cov=cov,
+                        p=np.full(modes, fill_value=1/modes))
 
     x, loga = x_sampler(n)
     y, logb = y_sampler(m)

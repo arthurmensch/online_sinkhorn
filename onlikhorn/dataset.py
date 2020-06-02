@@ -49,14 +49,14 @@ def create_sphere(n_samples=1000):
 
 
 def get_data_dir():
-    data_dir = os.path.expanduser('~/data/online_sinkorn')
+    data_dir = os.path.expanduser('~/data/online_sinkhorn')
     if not os.path.exists(data_dir):
         os.makedirs(data_dir)
     return data_dir
 
 
 def get_output_dir():
-    output_dir = os.path.expanduser('~/output/online_sinkorn')
+    output_dir = os.path.expanduser('~/output/online_sinkhorn')
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
     return output_dir

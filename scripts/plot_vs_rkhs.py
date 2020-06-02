@@ -427,19 +427,15 @@ def one_dimensional_exp():
     ax4.set_title('RKHS')
     ax5.set_title('O-S')
     # ax4.set_title('Estimated OT plan')
-    colors = plt.cm.get_cmap('Blues')(np.linspace(0.2, 1, len(sto_fevals)))
-    for i, eval in enumerate(sto_fevals):
-        n_iter = 10 * 50 * (i + 1)
-        if n_iter in [500, 2000, 4000]:
-            ax1.plot(grid, eval, color=colors[i],
-                     linewidth=2, label=None,
-                     zorder=1)
-    for i, eval in enumerate(sto_gevals):
-        n_iter = 10 * 50 * (i + 1)
-        if n_iter in [500, 2000, 4000]:
-            ax2.plot(grid, eval, color=colors[i],
-                     linewidth=2, label=f'O-S $n_t={n_iter}$',
-                     zorder=1)
+    colors = plt.cm.get_cmap('Blues')(np.linspace(0.2, 1, len(sto_fevals[::2])))
+    for i, eval in enumerate(sto_fevals[::2]):
+        ax1.plot(grid, eval, color=colors[i],
+                 linewidth=2, label=None,
+                 zorder=1)
+    for i, eval in enumerate(sto_gevals[::2]):
+        ax2.plot(grid, eval, color=colors[i],
+                 linewidth=2, label=f'O-S $n_t={i * 10 * 2 * 50}$' if i % 2 == 0 else None,
+                 zorder=1)
     ax1.legend(frameon=False, bbox_to_anchor=(0., 1), loc='upper left')
     ax2.legend(frameon=False, bbox_to_anchor=(0., 1), loc='upper left')
     sns.despine(fig)

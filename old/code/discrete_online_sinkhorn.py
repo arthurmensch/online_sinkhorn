@@ -449,7 +449,7 @@ def plot_comparison():
         ax.set_xscale('log')
         ax.set_yscale('log')
     axes[0].set_ylim([1e-2, 1e1])
-    axes[0].set_ylabel(r'$||f_t,g_t - f^\star,g^\star||_{\textrm{var}}$')
+    axes[0].set_ylabel(r'$||f_t,g_t - f^\star,g^\star||_{var}$')
     axes[1].set_ylabel('$| \mathcal{W}_t - \mathcal{W} |$')
     axes[1].set_ylim([1e-6, 1])
     axes[0].annotate('Computat°', xy=(0, 0), xycoords="axes fraction", xytext=(-45, -7),
@@ -462,7 +462,7 @@ def plot_comparison():
 
 
 if __name__ == '__main__':
-    main()
+    # main()
     # plot()
-    # plot_comparison()
+    plot_comparison()
     # plot_early_compute()

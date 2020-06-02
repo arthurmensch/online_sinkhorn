@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 from joblib import Parallel, Memory, delayed
 
-from onlikhorn.data import Subsampler, make_gmm_1d, make_random_5d, get_cloud_3d
+from onlikhorn.data import Subsampler, make_gmm_1d, make_random_5d, get_cloud_3d, make_gmm
 from onlikhorn.dataset import get_output_dir
 from onlikhorn.solver import sinkhorn, online_sinkhorn
 
@@ -17,6 +17,8 @@ def run_OT(source):
 
     if source == 'gmm_1d':
         (x, _), (y, _) = make_gmm_1d(1000, 1000)
+    elif source == 'gmm':
+        (x, _), (y, _) = make_gmm(10000, 10000, 10, 10)
     elif source == 'random_5d':
         (x, _), (y, _) = make_random_5d(1000, 2000)
     elif source == 'cloud_3d':
@@ -45,14 +47,14 @@ def run_OT(source):
         jobs.append((f'Sinkhorn s={step_size}/t^{step_size_exp}',
                      delayed(mem.cache(sinkhorn))(x, y, ref=ref, step_size=step_size, step_size_exp=step_size_exp,
                                                   epsilon=epsilon,
-                                                  max_updates=ref_updates)))
+                                                  max_updates=refine_updates)))
     # jobs.append(
     #     ('Random Sinkhorn', delayed(mem.cache(onlikhorn))(x_sampler, y_sampler, ref=ref, max_size=10,
     #                                                             full_update=False, step_size=1., step_size_exp=0.,
     #                                                             max_updates=n * 10, batch_size=10, no_memory=True)))
 
-    for full_update in [False]:
-        for batch_size in [10, 100]:
+    for full_update in [False, True]:
+        for batch_size in [100, 1000]:
             jobs.append(
                 (f'Online Sinhkorn b={batch_size}, full_update={full_update}',
                  delayed(mem.cache(online_sinkhorn))(x_sampler, y_sampler, max_size=(n, m),
@@ -73,7 +75,7 @@ def run_OT(source):
     #                                              step_size_exp=step_size_exp,
     #                                              batch_size=10, batch_size_exp=batch_size_exp,
     #                                              no_memory=False)))
-    traces = Parallel(n_jobs=3)(job for (name, job) in jobs)
+    traces = Parallel(n_jobs=6)(job for (name, job) in jobs)
     dfs = []
     for ot, (name, job) in zip(traces, jobs):
         trace = ot.callback.trace
@@ -118,7 +120,7 @@ def plot_results(source):
     # for name, sub_df in df.groupby(by='name'):
     #     ax.plot(sub_df['iter'], sub_df['computations'], label=name)
     # ax.set_yscale('log')
-    plt.show()
+    # plt.show()
 
 
 def make_prec_table(source):
@@ -145,6 +147,6 @@ def make_prec_table(source):
     print(speed_up.round(2))
 
 
-run_OT('gmm_1d')
-plot_results('gmm_1d')
+# run_OT('gmm')
+plot_results('gmm')
 # make_prec_table('cloud_3d')

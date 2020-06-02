@@ -11,6 +11,8 @@ def compute_distance(x, y):
 
 
 class OT:
+    """Useful to perform Online+full"""
+
     def __init__(self, max_size: Tuple[int, int], dimension, callback=None, step_size=1., step_size_exp=0.,
                  batch_size=1, batch_size_exp=0., avg_step_size=1., avg_step_size_exp=0., epsilon=1,
                  simultaneous=False,
@@ -91,9 +93,10 @@ class OT:
             g = None
         if f is not None:
             self.p_[:self.x_cursor_] = f - np.log(n)
+            self.n_updates_ += 1
         if g is not None:
             self.q_[:, self.x_cursor_] = g - np.log(m)
-        self.n_updates_ += 1
+            self.n_updates_ += 1
 
     def partial_fit(self, *, x=None, y=None, step_size=1., full_update=False, avg_step_size=1.):
         if x is None and y is None:
@@ -175,6 +178,7 @@ class OT:
                             self.avg_p_[:new_x_cursor] + np.log(1 - avg_step_size),
                             self.p_[:new_x_cursor] + np.log(avg_step_size))
             self.x_cursor_ = new_x_cursor
+            self.n_updates_ += 1
         if g is not None:
             if full_update:
                 self.q_[:, :new_y_cursor] = g - np.log(new_y_cursor)
@@ -192,7 +196,7 @@ class OT:
                             self.avg_q_[:, :new_y_cursor] + np.log(1 - avg_step_size),
                             self.q_[:, :new_y_cursor] + np.log(avg_step_size))
             self.y_cursor_ = new_y_cursor
-        self.n_updates_ += 1
+            self.n_updates_ += 1
 
     def refit(self, *, refit_f=True, refit_g=True, step_size=1.):
         if self.x_cursor_ == 0 or self.y_cursor_ == 0:
@@ -220,13 +224,14 @@ class OT:
             else:
                 self.p_[:self.x_cursor_, :] = np.logaddexp(f - np.log(self.x_cursor_) + np.log(step_size),
                                                            self.p_[:self.x_cursor_] + np.log(1 - step_size))
+            self.n_updates_ += 1
         if refit_g:
             if step_size == 1:
                 self.q_[:, :self.y_cursor_] = g - np.log(self.y_cursor_)
             else:
                 self.q_[:, :self.y_cursor_] = np.logaddexp(g - np.log(self.x_cursor_) + np.log(step_size),
                                                            self.q_[:self.x_cursor_] + np.log(1 - step_size))
-        self.n_updates_ += 1
+            self.n_updates_ += 1
 
     def compute_ot(self):
         if self.x_cursor_ == 0 or self.y_cursor_ == 0:
@@ -316,6 +321,10 @@ class OT:
             self.partial_fit(x=x, y=y, step_size=step_size, full_update=self.full_update, avg_step_size=avg_step_size)
         return self
 
+    @property
+    def n_samples_(self):
+        return self.x_cursor_ + self.y_cursor_
+
     def random_sinkhorn_loop(self, x_sampler, y_sampler):
         while self.n_updates_ < self.max_updates and not self.is_full:
             self._callback()
@@ -346,11 +355,11 @@ class OT:
         return self
 
 
-def sinkhorn(x, y, max_updates, ref=None, step_size=1., step_size_exp=0., epsilon=1 ):
+def sinkhorn(x, y, max_updates, ref=None, step_size=1., step_size_exp=0., epsilon=1, simultaneous=True):
     callback = Callback(ref)
     ot = OT(dimension=x.shape[1], max_updates=max_updates, callback=callback, max_size=(x.shape[0], y.shape[0]),
             epsilon=epsilon,
-            step_size=step_size, step_size_exp=step_size_exp, averaging=False, no_memory=False)
+            step_size=step_size, step_size_exp=step_size_exp, averaging=False, no_memory=False, simultaneous=simultaneous)
     ot.reset(x, y)
     ot.sinkhorn_loop()
     return ot
@@ -409,16 +418,17 @@ class Callback():
             w_rel = w_err / self.ref['w']
             var_rel = (var_norm(f - self.ref['f']) / var_norm(self.ref['f'])
                        + var_norm(g - self.ref['g']) / var_norm(self.ref['g']))
-            self.trace.append(dict(computations=ot.computations_, samples=ot.x_cursor_ + ot.y_cursor_,
+            self.trace.append(dict(computations=ot.computations_, samples=ot.n_samples_,
                                    iter=ot.n_updates_, w=w, w_rel=w_rel, var_rel=var_rel,
                                    var_err=var_err, w_err=w_err, n_updates=ot.n_updates_))
             print(f'Computations: {ot.computations_}, updates: {ot.n_updates_}, ot {w} w_err={w_err},'
                   f' var_err={var_err}')
         else:
             print(f'Computations: {ot.computations_}, updates: {ot.n_updates_}, ot {w}')
-            self.trace.append(dict(computations=ot.computations_, samples=ot.x_cursor_ + ot.y_cursor_,
+            self.trace.append(dict(computations=ot.computations_, samples=ot.n_samples_,
                                    iter=ot.n_updates_, w=w,
                                    n_updates=ot.n_updates_))
+
 
 def var_norm(x):
     return np.max(x) - np.min(x)

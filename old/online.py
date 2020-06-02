@@ -797,5 +797,5 @@ if __name__ == '__main__':
     # simple()
     # main()
     # plot()
-    # one_dimensional_exp()
-    one_dimensional_exp_rkhs()
+    one_dimensional_exp()
+    # one_dimensional_exp_rkhs()
