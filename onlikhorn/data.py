@@ -1,105 +1,49 @@
-import numpy as np
+import math
+from typing import List, Union, Optional
 
-from onlikhorn.dataset import get_dragon, create_sphere
+import numpy as np
+import torch
+from sklearn.utils import shuffle
 
 
 class Subsampler:
-    def __init__(self, x=None, size=None, cycle=True, small_last=False, return_idx=False):
-        if return_idx:
-            self.x = np.arange(size, dtype=np.long)
-            self.dim = 1
-        else:
-            self.x = np.array(x, copy=True)
-            self.dim = x.shape[1]
-        np.random.shuffle(self.x)
-        self.cursor = 0
+    def __init__(self, positions: torch.tensor, weights: torch.tensor, cycle=True):
+        self.positions = positions
         self.cycle = cycle
-        self.small_last = small_last
-        self.return_idx = False
+        self.weights = weights
+
+        if self.cycle:
+            self.idx = np.arange(len(self.positions), dtype=np.long)
+            self.positions, self.weights, self.idx = shuffle(self.positions, self.weights, self.idx)
+        self.cursor = 0
+
+    @property
+    def dimension(self):
+        return self.positions.shape[1]
 
     def __call__(self, n):
+        if n >= len(self.positions):
+            return self.positions, self.weights, self.idx.tolist()
         if not self.cycle:
-            x = self.x[np.random.permutation(len(self.x))[:n]]
+            idx = np.random.permutation(len(self.positions))[:n].tolist()
+            weights = self.weights[idx]
+            positions = self.positions[idx]
         else:
-            new_cursor = min(len(self.x), self.cursor + n)
-            x = np.array(self.x[self.cursor:new_cursor], copy=True)
-            if new_cursor == len(self.x):
-                np.random.shuffle(self.x)
-                if self.small_last:
-                    self.cursor = 0
-                else:
-                    self.cursor = (self.cursor + n) % len(self.x)
-                    x = np.concatenate([x, self.x[:self.cursor]], axis=0)
+            new_cursor = self.cursor + n
+            if new_cursor >= len(self.positions):
+                idx = self.idx[self.cursor:].copy()
+                positions = self.positions[self.cursor:].clone()
+                weights = self.weights[self.cursor:].clone()
+                self.positions, self.weights, self.idx = shuffle(self.positions, self.weights, self.idx)
+                reset_cursor = new_cursor - len(self.positions)
+                idx = np.concatenate([idx, self.idx[:reset_cursor]], axis=0)
+                positions = torch.cat([positions, self.positions[:reset_cursor]], dim=0)
+                weights = torch.cat([weights, self.weights[:reset_cursor]], dim=0)
+                self.cursor = reset_cursor
             else:
+                idx = self.idx[self.cursor:new_cursor].copy()
+                positions = self.positions[self.cursor:new_cursor].clone()
+                weights = self.weights[self.cursor:new_cursor].clone()
                 self.cursor = new_cursor
-        n = len(x)
-        return x, np.full((n, ), fill_value=-np.log(n))
-
-class Sampler:
-    def __init__(self, mean, cov, p):
-        k, d = mean.shape
-        k, d, d = cov.shape
-        k = p.shape
-        self.mean = mean
-        self.cov = cov
-        self.icov = np.concatenate([np.linalg.inv(cov)[None, :, :] for cov in self.cov], axis=0)
-        det = np.array([np.linalg.det(cov) for cov in self.cov])
-        self.norm = np.sqrt((2 * np.pi) ** d * det)
-        self.p = p
-        self.dim = d
-
-    def __call__(self, n):
-        k, d = self.mean.shape
-        indices = np.random.choice(k, n, p=self.p)
-        pos = np.zeros((n, d), dtype=np.float32)
-        for i in range(k):
-            mask = indices == i
-            size = mask.sum()
-            pos[mask] = np.random.multivariate_normal(self.mean[i], self.cov[i], size=size)
-        return pos, np.full((n,), fill_value=-np.log(n))
-
-    def log_prob(self, x):
-        # b, d = x.shape
-        diff = x[:, None, :] - self.mean[None, :]  # b, k, d
-        return np.sum(self.p[None, :] * np.exp(-np.einsum('bkd,kde,bke->bk',
-                                                          [diff, self.icov, diff]) / 2) / self.norm, axis=1)
-
-
-def make_gmm_1d(n, m):
-    x_sampler = Sampler(mean=np.array([[1.], [2], [3]]), cov=np.array([[[.1]], [[.1]], [[.1]]]),
-                        p=np.ones(3) / 3)
-    y_sampler = Sampler(mean=np.array([[0.], [3], [5]]), cov=np.array([[[.1]], [[.1]], [[.4]]]),
-                        p=np.ones(3) / 3)
-
-    x, loga = x_sampler(n)
-    y, logb = y_sampler(m)
-    return (x, loga), (y, logb)
-
-def make_gmm(n, m, d, modes):
-    means_x = np.random.rand(modes, d)
-    means_y = np.random.rand(modes, d)
-    cov = np.repeat(np.eye(d)[None, :, :], modes, axis=0) * 1e-1
-    x_sampler = Sampler(mean=means_x, cov=cov,
-                        p=np.full(modes, fill_value=1/modes))
-    y_sampler = Sampler(mean=means_y, cov=cov,
-                        p=np.full(modes, fill_value=1/modes))
-
-    x, loga = x_sampler(n)
-    y, logb = y_sampler(m)
-    return (x, loga), (y, logb)
-
-
-def make_random_5d(n, m):
-    x = np.random.randn(n, 5)
-    y = np.random.randn(m, 5) + 10
-    loga = np.full((x.shape[0], ), fill_value=-np.log(x.shape[0]))
-    logb = np.full((y.shape[0], ), fill_value=-np.log(y.shape[0]))
-    return (x, loga), (y, logb)
-
-
-def get_cloud_3d(data_dir=None):
-    a, x = get_dragon(data_dir)
-    b, y = create_sphere(int(1e4))
-    loga = np.full((x.shape[0], ), fill_value=-np.log(x.shape[0]))
-    logb = np.full((y.shape[0], ), fill_value=-np.log(y.shape[0]))
-    return (x, loga), (y, logb)
+        weights -= torch.logsumexp(weights, dim=0)
+        return positions, weights, idx.tolist()

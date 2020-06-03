@@ -5,7 +5,40 @@ import numpy as np
 import urllib.request
 import shutil
 
+import torch
 from plyfile import PlyData
+
+
+class GMMSampler:
+    def __init__(self, mean: torch.tensor, cov: torch.tensor, p: torch.tensor):
+        k, d = mean.shape
+        k, d, d = cov.shape
+        k = p.shape
+        self.dimension = d
+        self.mean = mean
+        self.cov = cov
+        self.icov = torch.cat([torch.inverse(cov)[None, :, :] for cov in self.cov], dim=0)
+        det = torch.tensor([torch.det(cov) for cov in self.cov])
+        self.norm = torch.sqrt((2 * np.pi) ** d * det)
+        self.p = p
+
+    def __call__(self, n):
+        k, d = self.mean.shape
+        indices = np.random.choice(k, n, p=self.p.numpy())
+        pos = np.zeros((n, d), dtype=np.float32)
+        for i in range(k):
+            mask = indices == i
+            size = mask.sum()
+            pos[mask] = np.random.multivariate_normal(self.mean[i], self.cov[i], size=size)
+        logweight = np.full_like(pos[:, 0], fill_value=-np.log(n))
+        return torch.from_numpy(pos), torch.from_numpy(logweight), None
+
+    def log_prob(self, x):
+        # b, d = x.shape
+        diff = x[:, None, :] - self.mean[None, :]  # b, k, d
+        return torch.log(torch.sum(self.p[None, :] * torch.exp(-torch.einsum('bkd,kde,bke->bk',
+                                                                             [diff, self.icov, diff]) / 2) / self.norm,
+                                   dim=1))
 
 
 def load_ply_file(fname, offset=[-0.011, 0.109, -0.008], scale=.04):
@@ -30,10 +63,14 @@ def load_ply_file(fname, offset=[-0.011, 0.109, -0.008], scale=.04):
     print("File loaded, and encoded as the weighted sum of {:,} atoms in 3D.".format(len(X)))
 
     # We return a (normalized) vector of weights + a "list" of points
-    return (S / np.sum(S)), X
+    X = torch.from_numpy(X).float()
+    S = torch.from_numpy(S).float().log()
+    S -= torch.logsumexp(S, dim=0)
+
+    return X, S
 
 
-def create_sphere(n_samples=1000):
+def make_sphere(n_samples=1000):
     """Creates a uniform sample on the unit sphere."""
     n_samples = int(n_samples)
 
@@ -42,10 +79,10 @@ def create_sphere(n_samples=1000):
     theta = np.pi * (1 + 5 ** 0.5) * indices
 
     x, y, z = np.cos(theta) * np.sin(phi), np.sin(theta) * np.sin(phi), np.cos(phi);
-    points = np.vstack((x, y, z)).T
-    weights = np.ones(n_samples) / n_samples
+    points = torch.from_numpy(np.vstack((x, y, z)).T).float()
+    weights = torch.full((n_samples, ), fill_value=-np.log(n_samples))
 
-    return weights, points
+    return points, weights
 
 
 def get_data_dir():
@@ -62,7 +99,7 @@ def get_output_dir():
     return output_dir
 
 
-def get_dragon(data_dir=None):
+def make_dragon(data_dir=None):
     if data_dir is None:
         data_dir = get_data_dir()
     filename = join(data_dir, 'dragon_recon/dragon_vrip_res4.ply')
@@ -73,3 +110,52 @@ def get_dragon(data_dir=None):
         shutil.unpack_archive(join(data_dir, 'dragon.tar.gz'), data_dir)
     return load_ply_file(filename, offset=[-0.011, 0.109, -0.008], scale=.04)
 
+
+def make_gmm_1d():
+    x_sampler = GMMSampler(mean=torch.tensor([[1.], [2], [3]]), cov=torch.tensor([[[.1]], [[.1]], [[.1]]]),
+                           p=torch.ones(3) / 3)
+    y_sampler = GMMSampler(mean=torch.tensor([[0.], [3], [5]]), cov=torch.tensor([[[.1]], [[.1]], [[.4]]]),
+                           p=torch.ones(3) / 3)
+
+    return x_sampler, y_sampler
+
+
+def make_gmm_2d():
+    cov_x = torch.eye(2) * .1, torch.eye(2) * .1, torch.eye(2) * .4
+    cov_y = torch.eye(2) * .1, torch.eye(2) * .1, torch.eye(2) * .1
+    cov_x = torch.cat([cov[None, :, :, ] for cov in cov_x], dim=0)
+    cov_y = torch.cat([cov[None, :, :] for cov in cov_y], dim=0)
+    x_sampler = GMMSampler(mean=torch.tensor([[1., 0], [2, 1.], [0., 1.]]), cov=cov_x,
+                           p=torch.ones(3) / 3)
+    y_sampler = GMMSampler(mean=torch.tensor([[0., -2], [2, -1], [3, 0]]), cov=cov_y,
+                           p=torch.ones(3) / 3)
+
+    return x_sampler, y_sampler
+
+
+def make_gmm(d, modes):
+    means_x = np.random.rand(modes, d)
+    means_y = np.random.rand(modes, d)
+    cov = np.repeat(np.eye(d)[None, :, :], modes, axis=0) * 1e-1
+    means_x = torch.from_numpy(means_x).float()
+    means_y = torch.from_numpy(means_y).float()
+    cov = torch.from_numpy(cov).float()
+    p = torch.full(modes, fill_value=1 / modes)
+    x_sampler = GMMSampler(mean=means_x, cov=cov, p=p)
+    y_sampler = GMMSampler(mean=means_y, cov=cov, p=p)
+
+    return x_sampler, y_sampler
+
+
+
+def make_gmm_2d_simple():
+    cov_x = [torch.eye(2) * .1]
+    cov_y = [torch.eye(2) * .1]
+    cov_x = torch.cat([cov[None, :, :, ] for cov in cov_x], dim=0)
+    cov_y = torch.cat([cov[None, :, :] for cov in cov_y], dim=0)
+    x_sampler = GMMSampler(mean=torch.tensor([[1., 0]]), cov=cov_x,
+                           p=torch.ones(1))
+    y_sampler = GMMSampler(mean=torch.tensor([[0., -2]]), cov=cov_y,
+                           p=torch.ones(1))
+
+    return x_sampler, y_sampler
