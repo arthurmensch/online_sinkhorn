@@ -7,8 +7,10 @@ class Subsampler:
     def __init__(self, x=None, size=None, cycle=True, small_last=False, return_idx=False):
         if return_idx:
             self.x = np.arange(size, dtype=np.long)
+            self.dim = 1
         else:
             self.x = np.array(x, copy=True)
+            self.dim = x.shape[1]
         np.random.shuffle(self.x)
         self.cursor = 0
         self.cycle = cycle

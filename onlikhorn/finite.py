@@ -123,10 +123,13 @@ class FiniteOT:
                     self.p_[x_seen_indices, :] = -float('inf')
                     self.p_[x_indices, :] = f - np.log(batch_size)
             if self.averaging:
-                self.avg_p_[x_seen_indices] += np.log(1 - avg_step_size)
-                self.avg_p_[x_indices] = np.logaddexp(self.avg_p_[x_indices],
-                                                      self.p_[x_indices] + np.log(avg_step_size),
-                                                      )
+                if avg_step_size == 1:
+                    self.avg_p_[:, :] = self.p_[:, :]
+                else:
+                    self.avg_p_[x_seen_indices] += np.log(1 - avg_step_size)
+                    self.avg_p_[x_indices] = np.logaddexp(self.avg_p_[x_indices],
+                                                          self.p_[x_indices] + np.log(avg_step_size),
+                                                          )
             self.n_updates_ += 1
         if g is not None:
             if full_update:
@@ -147,10 +150,13 @@ class FiniteOT:
                     self.q_[:, y_indices] = g - np.log(batch_size)
 
             if self.averaging:
-                self.avg_q_[:, y_seen_indices] += np.log(1 - avg_step_size)
-                self.avg_q_[:, y_indices] = np.logaddexp(self.avg_q_[:, y_indices],
-                                                         self.q_[:, y_indices] + np.log(avg_step_size),
-                                                         )
+                if avg_step_size == 1:
+                    self.avg_q_[:, :] = self.q_[:, :]
+                else:
+                    self.avg_q_[:, y_seen_indices] += np.log(1 - avg_step_size)
+                    self.avg_q_[:, y_indices] = np.logaddexp(self.avg_q_[:, y_indices],
+                                                             self.q_[:, y_indices] + np.log(avg_step_size),
+                                                             )
             self.n_updates_ += 1
 
     def _callback(self):
@@ -180,6 +186,7 @@ class FiniteOT:
                 batch_size_y = min(len(self.y_), batch_size)
             else:
                 batch_size_x = batch_size_y = self.batch_size
+            print(batch_size_x, batch_size_y, step_size)
             if batch_size_x == len(self.x_) and batch_size_y == len(self.y_):
                 step_size = 1
 

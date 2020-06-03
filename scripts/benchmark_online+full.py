@@ -18,7 +18,7 @@ def run_OT(source):
     if source == 'gmm_1d':
         (x, _), (y, _) = make_gmm_1d(1000, 1000)
     elif source == 'gmm':
-        (x, _), (y, _) = make_gmm(10000, 10000, 10, 10)
+        (x, _), (y, _) = make_gmm(1000, 1000, 4, 2)
     elif source == 'random_5d':
         (x, _), (y, _) = make_random_5d(1000, 2000)
     elif source == 'cloud_3d':
@@ -26,14 +26,17 @@ def run_OT(source):
         x = x[:11000]  # we do not handle gracefully batches that are not full FIXME
         y = y[:10000]
 
-    epsilon = 1e-1
+    epsilon = 1e-2
 
     n = x.shape[0]
     m = y.shape[0]
-    ref_updates = 200
+    ref_updates = 400
     refine_updates = 100
 
     mem = Memory(location=None)
+
+    batch_size = int(0.01 * len(x))
+    avg_step_size_exp = 0
 
     ot = mem.cache(sinkhorn)(x, y, ref_updates, epsilon=epsilon)
     f, g = ot.evaluate_potential(x=x, y=y)
@@ -43,62 +46,65 @@ def run_OT(source):
     y_sampler = Subsampler(y)
 
     jobs = []
-    for step_size, step_size_exp in [(1., 0.)]:
-        jobs.append((f'Sinkhorn s={step_size}/t^{step_size_exp}',
-                     delayed(mem.cache(sinkhorn))(x, y, ref=ref, step_size=step_size, step_size_exp=step_size_exp,
-                                                  epsilon=epsilon,
-                                                  max_updates=refine_updates)))
-    # jobs.append(
-    #     ('Random Sinkhorn', delayed(mem.cache(onlikhorn))(x_sampler, y_sampler, ref=ref, max_size=10,
-    #                                                             full_update=False, step_size=1., step_size_exp=0.,
-    #                                                             max_updates=n * 10, batch_size=10, no_memory=True)))
+    grid = []
+    # Test other
+    # FC Online Sinkhorn
+    grid.append(dict(batch_size_exp=0.6, batch_size=batch_size, step_size_exp=0., avg_step_size_exp=avg_step_size_exp, full_update=True))
+    grid.append(dict(batch_size_exp=0.1, batch_size=batch_size, step_size_exp=0.5, avg_step_size_exp=avg_step_size_exp, full_update=True))
+    grid.append(dict(batch_size_exp=0., batch_size=batch_size, step_size_exp=0.6, avg_step_size_exp=avg_step_size_exp, full_update=True))
 
-    for full_update in [False, True]:
-        for batch_size in [100, 1000]:
-            jobs.append(
-                (f'Online Sinhkorn b={batch_size}, full_update={full_update}',
-                 delayed(mem.cache(online_sinkhorn))(x_sampler, y_sampler, max_size=(n, m),
-                                                     epsilon=epsilon,
-                                                     refine_updates=refine_updates,
-                                                     ref=ref,
-                                                     full_update=full_update, step_size=1,
-                                                     step_size_exp=0 if full_update else 1 / 2,
-                                                     batch_size=batch_size, batch_size_exp=0,
-                                                     )))
+    # Online Sinkhorn
+    grid.append(dict(batch_size_exp=1.1, batch_size=batch_size, step_size_exp=0., avg_step_size_exp=avg_step_size_exp,
+                     full_update=False))
+    grid.append(dict(batch_size_exp=0.6, batch_size=batch_size, step_size_exp=0.5, avg_step_size_exp=avg_step_size_exp, full_update=False))
+    grid.append(dict(batch_size_exp=0.1, batch_size=batch_size, step_size_exp=1, avg_step_size_exp=avg_step_size_exp, full_update=True))
 
-    # for (step_size_exp, batch_size_exp) in ([1, 0.], [.5, .5], [0., 1.], [.5, 1], [.5, 1]):
-    #     jobs.append(
-    #         (f'Online Sinhkorn s=1/t^{step_size_exp} b=10 t^{2 * batch_size_exp}',
-    #          delayed(mem.cache(onlikhorn))(x_sampler, y_sampler, max_size=n * 10,
-    #                                              ref=ref, max_updates='auto',
-    #                                              full_update=False, step_size=1.,
-    #                                              step_size_exp=step_size_exp,
-    #                                              batch_size=10, batch_size_exp=batch_size_exp,
-    #                                              no_memory=False)))
-    traces = Parallel(n_jobs=6)(job for (name, job) in jobs)
+    # Random Sinkhorn
+    grid.append(dict(batch_size_exp=0, batch_size=batch_size, step_size_exp=0., avg_step_size_exp=avg_step_size_exp, full_update=False,))
+
+    # Does it converge
+    # grid.append(dict(batch_size_exp=0, batch_size=batch_size, step_size_exp=0., avg_step_size_exp=1., full_update=True,))
+
+    # Baseline
+    grid.append(dict(batch_size_exp=0, batch_size=len(x), step_size_exp=0, avg_step_size_exp=0., full_update=True))
+
+    for p in grid:
+        if p["batch_size_exp"] == 'auto':
+            p["batch_size_exp"] = 1 - p["step_size_exp"] + 0.1
+        jobs.append(
+            [p,
+             delayed(mem.cache(online_sinkhorn))(x_sampler, y_sampler, max_size=(n, m),
+              epsilon=epsilon,
+              refine_updates=refine_updates,
+              ref=ref,
+              full_update=p["full_update"], step_size=1,
+              step_size_exp=p["step_size_exp"],
+              avg_step_size_exp=p["avg_step_size_exp"], averaging=False,
+              batch_size=p["batch_size"], batch_size_exp=p["batch_size_exp"],
+              )])
+
+    traces = Parallel(n_jobs=9)(job for (_, job) in jobs)
     dfs = []
-    for ot, (name, job) in zip(traces, jobs):
+    for ot, (params, job) in zip(traces, jobs):
         trace = ot.callback.trace
         df = pd.DataFrame(trace)
-        df['name'] = name
+        for k, v in params.items():
+            df[k] = v
         dfs.append(df)
     dfs = pd.concat(dfs, axis=0)
     output_dir = get_output_dir()
-    dfs.to_pickle(join(output_dir, f'results_warmstart_big_{source}_new.pkl'))
+    dfs.to_pickle(join(output_dir, f'results_finite_{source}_rates_3.pkl'))
 
 
 def plot_results(source):
     output_dir = get_output_dir()
-    df = pd.read_pickle(join(output_dir, f'results_warmstart_big_{source}_new.pkl'))
+    df = pd.read_pickle(join(output_dir, f'results_finite_{source}_rates_3.pkl'))
     fig, axes = plt.subplots(2, 3, figsize=(15, 10), sharex='col', sharey='row')
-    for name, sub_df in df.groupby(by='name'):
-        # computations = [1] + sub_df['computations'].tolist()
-        # axes[0][0].plot(computations, [sub_df['w_rel'].iloc[0]] + sub_df['w_rel'].tolist(), label=name)
-        # axes[1][0].plot(computations, [sub_df['var_err'].iloc[0]] + sub_df['var_err'].tolist(), label=name)
-        # iterations = sub_df['iter'].copy()
-        # iterations.iloc[0] = 0.1
-        # axes[0][2].plot(iterations, sub_df['w_rel'], label=name)
-        # axes[1][2].plot(iterations, sub_df['var_err'], label=name)
+    # df = df.loc[df['batch_size_exp'] == 0.1]
+    for index, sub_df in df.groupby(
+            by=['batch_size', 'batch_size_exp', 'step_size_exp', "full_update", "avg_step_size_exp"]):
+        name = index
+        sub_df = sub_df.iloc[:-3]
         axes[0][0].plot(sub_df['computations'], sub_df['w_err'], label=name)
         axes[1][0].plot(sub_df['computations'], sub_df['var_err'], label=name)
         axes[0][2].plot(sub_df['iter'], sub_df['w_err'], label=name)
@@ -113,14 +119,9 @@ def plot_results(source):
     axes[1][2].set_xlabel('Iteration')
     axes[0][0].set_ylabel('W err')
     axes[1][0].set_ylabel('Var err')
-    # axes[0][0].set_ylim([1e-3, 1e2])
     axes[1][1].legend()
-    fig.savefig(join(output_dir, 'results.pdf'))
-    # fig, ax = plt.subplots(1, 1)
-    # for name, sub_df in df.groupby(by='name'):
-    #     ax.plot(sub_df['iter'], sub_df['computations'], label=name)
-    # ax.set_yscale('log')
-    # plt.show()
+    fig.savefig(join(output_dir, f'results_{source}.pdf'))
+    plt.show()
 
 
 def make_prec_table(source):
@@ -147,6 +148,6 @@ def make_prec_table(source):
     print(speed_up.round(2))
 
 
-# run_OT('gmm')
+run_OT('gmm')
 plot_results('gmm')
 # make_prec_table('cloud_3d')
