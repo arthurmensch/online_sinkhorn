@@ -38,6 +38,7 @@ def make_gmm_2d():
 
     return x_sampler, y_sampler
 
+
 def make_gmm_2d_simple():
     cov_x = [torch.eye(2) * .1]
     cov_y = [torch.eye(2) * .1]
