@@ -87,7 +87,7 @@ def run_OT(source):
 
 def plot_results(source):
     output_dir = get_output_dir()
-    df = pd.read_pickle(join(output_dir, f'results_warmstart_big_{source}_new.pkl'))
+    df = pd.read_pickle(join(output_dir, f'results_warmstart_big_{source}.pkl'))
     fig, axes = plt.subplots(2, 3, figsize=(15, 10), sharex='col', sharey='row')
     for name, sub_df in df.groupby(by='name'):
         # computations = [1] + sub_df['computations'].tolist()
@@ -145,6 +145,6 @@ def make_prec_table(source):
     print(speed_up.round(2))
 
 
-run_OT('gmm_1d')
-plot_results('gmm_1d')
+# run_OT('cloud_3d')
+plot_results('cloud_3d')
 # make_prec_table('cloud_3d')
