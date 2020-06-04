@@ -15,6 +15,10 @@ class Subsampler:
         self.cursor = 0
 
     @property
+    def device(self):
+        return self.positions.device
+
+    @property
     def dimension(self):
         return self.positions.shape[1]
 
