@@ -76,7 +76,7 @@ def load_ply_file(fname, offset=[-0.011, 0.109, -0.008], scale=.04):
     return X, S
 
 
-def make_sphere(n_samples=1000):
+def make_sphere(n_samples=10000):
     """Creates a uniform sample on the unit sphere."""
     n_samples = int(n_samples)
 
@@ -171,13 +171,15 @@ def make_data(data_source, n_samples):
     if data_source == 'dragon':
         x, la = make_sphere()
         y, lb = make_dragon()
+        x *= 2
+        y *= 2
         x_sampler = Subsampler(x, la)
-        y_sampler = Subsampler(y, la)
+        y_sampler = Subsampler(y, lb)
     else:
         if data_source == 'gmm_1d':
             x_sampler, y_sampler = make_gmm_1d()
         elif data_source == 'gmm_2d':
-            x_sampler, y_sampler = make_gmm_1d()
+            x_sampler, y_sampler = make_gmm_2d()
         elif data_source == 'gmm_10d':
             x_sampler, y_sampler = make_gmm(10, 10)
         else:

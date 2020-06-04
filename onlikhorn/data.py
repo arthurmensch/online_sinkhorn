@@ -24,7 +24,7 @@ class Subsampler:
 
     def to(self, device):
         self.positions = self.positions.to(device)
-        self.weights = self.positions.to(device)
+        self.weights = self.weights.to(device)
         return self
 
     def __call__(self, n):

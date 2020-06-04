@@ -19,7 +19,7 @@ def test_algorithm(save_trace, algorithm, device):
                                           y.to(device), lb.to(device), x_sampler.to(device), y_sampler.to(device))
     if save_trace == 'ref':
         F, G = sinkhorn(x=x, la=la, y=y, lb=lb, n_iter=10)
-        ref = (F, x, G, y)
+        ref = {'train': (F(x), x, G(y), y), 'test': (F(x), x, G(y), y)}
         save_trace = True
     else:
         if save_trace and algorithm == 'random_sinkhorn':
@@ -61,7 +61,7 @@ def test_online_sinkhorn(save_trace, refit, force_full, use_finite, lr, batch_si
                                           y.to(device), lb.to(device), x_sampler.to(device), y_sampler.to(device))
     if save_trace:
         F, G = sinkhorn(x=x, la=la, y=y, lb=lb, n_iter=10)
-        ref = (F, x, G, y)
+        ref = {'train': (F(x), x, G(y), y), 'test': (F(x), x, G(y), y)}
     else:
         ref = None
     if use_finite:

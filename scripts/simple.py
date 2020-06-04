@@ -82,7 +82,7 @@ def plot_2d():
 
     x, la, _ = x_sampler(ref_grid)
     y, lb, _ = y_sampler(ref_grid)
-    F, G = sinkhorn(x, la, y, lb, n_iter=ref_iter, epsilon=epsilon)
+    F, G = sinkhorn(x, la, y, lb, n_iter=ref_iter, epsilon=epsilon, max_cal=int(1e8))
 
     batch_sizes = np.ceil(batch_size * np.float_power(np.arange(n_iter, dtype=float) + 1, batch_exp)).astype(int)
     lrs = (lr * np.float_power(np.arange(n_iter, dtype=float) + 1, -lr_exp))

@@ -50,6 +50,10 @@ class BasePotential:
     def add_weight(self, weight):
         self.weights[self.seen] += weight
 
+    @property
+    def n_samples_(self):
+        return len(self.positions[self.seen])
+
     def __call__(self, positions: torch.tensor = None, C=None, free=False, free_scaling=False, free_compute=False):
         """Evaluation"""
         if free:  # hacks as the implementation of memory persistence is not finished
@@ -167,16 +171,17 @@ class InfinitePotential(BasePotential):
 
 
 def subsampled_sinkhorn(x, la, y, lb, n_iter=100, batch_size: int = 10, epsilon=1, save_trace=False, ref=None,
-                        precompute_C=True):
+                        precompute_C=True, count_recompute=False, max_calls=None,):
     x_sampler = Subsampler(x, la)
     y_sampler = Subsampler(y, lb)
     x, la, xidx = x_sampler(batch_size)
     y, lb, yidx = y_sampler(batch_size)
-    return sinkhorn(x, la, y, lb, n_iter, epsilon, save_trace=save_trace, ref=ref, precompute_C=precompute_C)
+    return sinkhorn(x, la, y, lb, n_iter, epsilon, save_trace=save_trace, ref=ref, precompute_C=precompute_C,
+                    count_recompute=count_recompute, max_calls=max_calls)
 
 
 def sinkhorn(x, la, y, lb, n_iter=100, epsilon=1., save_trace=False, F=None, G=None, precompute_C=True, trace=None,
-             precompute_for_free=False, count_recompute=False,
+             precompute_for_free=False, count_recompute=False, max_calls=None, verbose=True,
              ref=None,
              start_iter=0):
     if F is None:
@@ -192,9 +197,9 @@ def sinkhorn(x, la, y, lb, n_iter=100, epsilon=1., save_trace=False, F=None, G=N
     else:
         Cxy, Cyx = None, None
 
-    trace, fr, gr, xr, yr = check_trace(save_trace, trace=trace, ref=ref, ref_needed=False)
+    trace, ref = check_trace(save_trace, trace=trace, ref=ref, ref_needed=False)
 
-    for n_iter in range(start_iter, n_iter):
+    for i in range(start_iter, n_iter):
         eG = G(positions=y, C=Cyx)
         if save_trace:
             fixed_err = var_norm(eG + lb - F.weights)
@@ -203,23 +208,30 @@ def sinkhorn(x, la, y, lb, n_iter=100, epsilon=1., save_trace=False, F=None, G=N
             fixed_err, w = None, None
         F.push(slice(None), eG + lb, override=True)
         eF = F(positions=x, C=Cxy)
+        n_calls = F.n_calls_ + G.n_calls_
+        n_samples = F.n_samples_ + G.n_samples_
+        if max_calls is not None and n_calls > max_calls:
+            break
         if save_trace:
             fixed_err += var_norm(eF + la - G.weights)
             w += (eF * la.exp()).sum()
-            this_trace = dict(n_iter=n_iter + 1, n_calls=F.n_calls_ + G.n_calls_, fixed_err=fixed_err.item(), w=w.item(),
-                              algorithm='full')
-            if ref is not None:
-                this_trace['ref_err'] = (var_norm(F(xr, free=True) - fr) + var_norm(G(yr, free=True) - gr)).item()
+            this_trace = dict(n_iter=i + 1, n_calls=n_calls, n_samples=n_samples,
+                              fixed_err=fixed_err.item(), w=w.item(), algorithm='full')
+            for name, (fr, xr, gr, yr) in ref.items():
+                this_trace[f'ref_err_{name}'] = (var_norm(F(xr, free=True) - fr) + var_norm(G(yr, free=True) - gr)).item()
             trace.append(this_trace)
+        else:
+            this_trace = dict(n_iter=i + 1, n_calls=n_calls)
+        if verbose:
             print(' '.join(f'{k}:{v}' for k, v in this_trace.items()))
         G.push(slice(None), eF + la, override=True)
     anchor = F(torch.zeros_like(x[[0]]))
     F.add_weight(anchor)
     G.add_weight(-anchor)
     if save_trace:
-        return F.cpu(), G.cpu(), trace
+        return F, G, trace
     else:
-        return F.cpu(), G.cpu()
+        return F, G
 
 
 def online_sinkhorn(x_sampler=None, y_sampler=None,
@@ -227,7 +239,7 @@ def online_sinkhorn(x_sampler=None, y_sampler=None,
                     epsilon=1., max_length=100000, trim_every=None,
                     refit=False,
                     n_iter=100, force_full=True,
-                    batch_sizes: Optional[Union[List[int], int]] = 10,
+                    batch_sizes: Optional[Union[List[int], int]] = 10, max_calls=None,
                     lrs: Union[List[float], float] = .1, save_trace=False, ref=None):
     if not isinstance(batch_sizes, int) or not isinstance(batch_sizes, int):
         if not isinstance(batch_sizes, int):
@@ -263,13 +275,19 @@ def online_sinkhorn(x_sampler=None, y_sampler=None,
     F.push(yidx if use_finite else y, la)
     G.push(xidx if use_finite else x, lb)
 
-    trace, fr, gr, xr, yr = check_trace(save_trace, ref=ref, ref_needed=True)
+    trace, ref = check_trace(save_trace, ref=ref, ref_needed=True)
 
     for i in range(n_iter):
+        n_calls = F.n_calls_ + G.n_calls_
+        n_samples = F.n_samples_ + G.n_samples_
+        if max_calls is not None and n_calls > max_calls:
+            break
         if save_trace:
-            ref_err = (var_norm(F(xr, free=True) - fr) + var_norm(G(yr, free=True) - gr)).item()
-            trace.append(dict(n_iter=i, n_calls=F.n_calls_ + G.n_calls_, ref_err=ref_err, algorithm='online'))
-            print(' '.join(f'{k}:{v}' for k, v in trace[-1].items()))
+            this_trace = dict(n_iter=i, n_calls=n_calls, n_samples=n_samples, algorithm='online')
+            for name, (fr, xr, gr, yr) in ref.items():
+                this_trace[f'ref_err_{name}'] = (var_norm(F(xr, free=True) - fr) + var_norm(G(yr, free=True) - gr)).item()
+            trace.append(this_trace)
+            print(' '.join(f'{k}:{v}' for k, v in this_trace.items()))
         if use_finite and force_full:
             if G.full and F.full:  # Force full iterations once every point has been observed
                 res = sinkhorn(xf, laf, yf, lbf, F=F, G=G, save_trace=save_trace, trace=trace, start_iter=i,
@@ -316,19 +334,16 @@ def check_trace(save_trace=False, trace=None, ref=None, ref_needed=False):
             if ref_needed:
                 raise ValueError('Must provide ref when asking to save trace')
             else:
-                fr, gr, xr, yr = None, None, None, None
-        else:
-            (Fr, xr, Gr, yr) = ref
-            fr, gr = Fr(xr), Gr(yr)
+                ref = {}
     else:
-        trace, fr, gr, xr, yr = None, None, None, None, None
-    return trace, fr, gr, xr, yr
+        trace = None
+    return trace, ref
 
 
 def random_sinkhorn(x_sampler=None, y_sampler=None, x=None, la=None, y=None, lb=None, use_finite=True, n_iter=100,
-                    epsilon=1,
+                    epsilon=1, max_calls=None,
                     batch_sizes: Union[List[int], int] = 10, save_trace=False, ref=None):
-    trace, fr, gr, xr, yr = check_trace(save_trace, ref=ref, ref_needed=True)
+    trace, ref = check_trace(save_trace, ref=ref, ref_needed=True)
 
     if isinstance(batch_sizes, int):
         batch_sizes = [batch_sizes for _ in range(n_iter)]
@@ -338,27 +353,32 @@ def random_sinkhorn(x_sampler=None, y_sampler=None, x=None, la=None, y=None, lb=
         x_sampler = Subsampler(x, la)
         y_sampler = Subsampler(y, lb)
     F, G = None, None
-    total_calls = 0
+    n_calls = 0
     for i in range(n_iter):
+        if max_calls is not None and n_calls > max_calls:
+            break
         x, la, _ = x_sampler(batch_sizes[i])
         y, lb, _ = y_sampler(batch_sizes[i])
         eG = 0 if i == 0 else G(y)
         F = FinitePotential(y, eG + lb, epsilon=epsilon)
         eF = 0 if i == 0 else F(x)
         G = FinitePotential(x, eF + la, epsilon=epsilon)
-        total_calls += F.n_calls_ + G.n_calls_
+        n_samples = F.n_samples_ + G.n_samples_
+        n_calls += F.n_calls_ + G.n_calls_
         if save_trace:
-            ref_err = (var_norm(F(xr, free=True) - fr) + var_norm(G(yr, free=True) - gr)).item()
-            trace.append(dict(n_iter=i + 1, n_calls=total_calls, ref_err=ref_err, algorithm='random'))
-            print(' '.join(f'{k}:{v}' for k, v in trace[-1].items()))
+            this_trace = dict(n_iter=i + 1, n_calls=n_calls, n_samples=n_samples, algorithm='random')
+            for name, (fr, xr, gr, yr) in ref.items():
+                this_trace[f'ref_err_{name}'] = (var_norm(F(xr, free=True) - fr) + var_norm(G(yr, free=True) - gr)).item()
+            print(' '.join(f'{k}:{v}' for k, v in this_trace.items()))
+            trace.append(this_trace)
     if save_trace:
-        return F.cpu(), G.cpu(), trace
+        return F, G, trace
     else:
-        return F.cpu(), G.cpu()
+        return F, G
 
 
 def schedule(batch_exp, batch_size, lr, lr_exp, max_length, n_iter, refit, iota=.1):
-    batch_sizes = np.ceil(batch_size * np.float_power(np.arange(n_iter, dtype=float) + 1, batch_exp)).astype(int)
+    batch_sizes = np.ceil(batch_size * np.float_power(np.linspace(1., n_iter / 10, n_iter), batch_exp)).astype(int)  # Those are important hyperparameters...
     batch_sizes[batch_sizes > max_length] = max_length
     batch_sizes = batch_sizes.tolist()
     if lr_exp == 'auto':
@@ -366,5 +386,5 @@ def schedule(batch_exp, batch_size, lr, lr_exp, max_length, n_iter, refit, iota=
             lr_exp = min(max(0, 1 - batch_exp / 2 + iota), 1)
         else:
             lr_exp = min(max(0, 1 - (batch_exp + 1) / 2 + iota), 1)
-    lrs = (lr * np.float_power(np.arange(n_iter, dtype=float) + 1, -lr_exp)).tolist()
+    lrs = (lr * np.float_power(np.linspace(1, n_iter / 10, n_iter), -lr_exp)).tolist()
     return batch_sizes, lrs, lr_exp
