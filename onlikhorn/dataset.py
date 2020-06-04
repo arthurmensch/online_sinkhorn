@@ -1,12 +1,13 @@
 import os
+import shutil
+import urllib.request
 from os.path import join
 
 import numpy as np
-import urllib.request
-import shutil
-
 import torch
 from plyfile import PlyData
+
+from onlikhorn.data import Subsampler
 
 
 class GMMSampler:
@@ -21,6 +22,11 @@ class GMMSampler:
         det = torch.tensor([torch.det(cov) for cov in self.cov])
         self.norm = torch.sqrt((2 * np.pi) ** d * det)
         self.p = p
+        self.device = 'cpu'
+
+    def to(self, device):
+        self.device = device
+        return self
 
     def __call__(self, n):
         k, d = self.mean.shape
@@ -31,7 +37,7 @@ class GMMSampler:
             size = mask.sum()
             pos[mask] = np.random.multivariate_normal(self.mean[i], self.cov[i], size=size)
         logweight = np.full_like(pos[:, 0], fill_value=-np.log(n))
-        return torch.from_numpy(pos), torch.from_numpy(logweight), None
+        return torch.from_numpy(pos).to(self.device), torch.from_numpy(logweight).to(self.device), None
 
     def log_prob(self, x):
         # b, d = x.shape
@@ -140,7 +146,7 @@ def make_gmm(d, modes):
     means_x = torch.from_numpy(means_x).float()
     means_y = torch.from_numpy(means_y).float()
     cov = torch.from_numpy(cov).float()
-    p = torch.full(modes, fill_value=1 / modes)
+    p = torch.full((modes, ), fill_value=1 / modes)
     x_sampler = GMMSampler(mean=means_x, cov=cov, p=p)
     y_sampler = GMMSampler(mean=means_y, cov=cov, p=p)
 
@@ -159,3 +165,23 @@ def make_gmm_2d_simple():
                            p=torch.ones(1))
 
     return x_sampler, y_sampler
+
+
+def make_data(data_source, n_samples):
+    if data_source == 'dragon':
+        x, la = make_sphere()
+        y, lb = make_dragon()
+        x_sampler = Subsampler(x, la)
+        y_sampler = Subsampler(y, la)
+    else:
+        if data_source == 'gmm_1d':
+            x_sampler, y_sampler = make_gmm_1d()
+        elif data_source == 'gmm_2d':
+            x_sampler, y_sampler = make_gmm_1d()
+        elif data_source == 'gmm_10d':
+            x_sampler, y_sampler = make_gmm(10, 10)
+        else:
+            raise ValueError
+        x, la, _ = x_sampler(n_samples)
+        y, lb, _ = y_sampler(n_samples)
+    return x, la, y, lb, x_sampler, y_sampler

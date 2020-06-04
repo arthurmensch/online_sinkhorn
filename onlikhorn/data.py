@@ -1,6 +1,3 @@
-import math
-from typing import List, Union, Optional
-
 import numpy as np
 import torch
 from sklearn.utils import shuffle
@@ -20,6 +17,11 @@ class Subsampler:
     @property
     def dimension(self):
         return self.positions.shape[1]
+
+    def to(self, device):
+        self.positions = self.positions.to(device)
+        self.weights = self.positions.to(device)
+        return self
 
     def __call__(self, n):
         if n >= len(self.positions):
@@ -47,3 +49,4 @@ class Subsampler:
                 self.cursor = new_cursor
         weights -= torch.logsumexp(weights, dim=0)
         return positions, weights, idx.tolist()
+
