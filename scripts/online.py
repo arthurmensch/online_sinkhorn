@@ -10,7 +10,7 @@ from onlikhorn.algorithm import sinkhorn, online_sinkhorn, random_sinkhorn, subs
 from onlikhorn.cache import torch_cached
 from onlikhorn.dataset import get_output_dir, make_data
 
-exp_name = 'online_grid6'
+exp_name = 'online_grid12'
 exp = Experiment(exp_name)
 exp_dir = join(get_output_dir(), exp_name)
 exp.observers = [FileStorageObserver(exp_dir)]
@@ -20,7 +20,7 @@ exp.observers = [FileStorageObserver(exp_dir)]
 def config():
     data_source = 'gmm_1d'
     n_samples = 10000
-    n_iter = 1000
+    n_iter = 3000
     max_length = 100000
     device = 'cuda'
 
@@ -75,10 +75,33 @@ def debug():
     lr = 1
     refit = True
 
+@exp.named_config
+def debug_dragon():
+    data_source = 'dragon'
+    n_samples = 1000
+    n_iter = 200
+    max_length = 10000
+    device = 'cuda'
+
+    # Overrided
+    batch_size = 100
+    seed = 0
+    epsilon = 1e-1
+
+    # method = 'online_as_warmup'
+    method = 'sinkhorn_precompute'
+    batch_exp = 0
+    lr_exp = 1/2
+    lr = 1
+    refit = True
+
 
 @exp.main
 def run(data_source, n_samples, epsilon, n_iter, device, method,
         batch_exp, batch_size, lr, lr_exp, max_length, refit, _seed, _run):
+
+    if refit:
+        max_length = 20000
     np.random.seed(_seed)
     torch.manual_seed(_seed)
     output_dir = join(exp.observers[0].dir, 'artifacts')
@@ -91,22 +114,22 @@ def run(data_source, n_samples, epsilon, n_iter, device, method,
     x_sampler.to(device)
     y_sampler.to(device)
 
-    F, G, trace = torch_cached(sinkhorn)(x, la, y, lb, n_iter=2 * n_iter, epsilon=epsilon, save_trace=True,
+    F, G, trace = torch_cached(sinkhorn)(x, la, y, lb, n_iter=4 * n_iter, epsilon=epsilon, save_trace=True,
                                          verbose=False,
                                          count_recompute=True)
     xr, lar, yr, lbr, _, _ = make_data(data_source, n_samples)
     xr, yr, lar, lbr = xr.to(device), yr.to(device), lar.to(device), lbr.to(device)
-    Fr, Gr, tracer = torch_cached(sinkhorn)(xr, lar, yr, lbr, n_iter=2 * n_iter, epsilon=epsilon, save_trace=True,
+    Fr, Gr, tracer = torch_cached(sinkhorn)(xr, lar, yr, lbr, n_iter=4 * n_iter, epsilon=epsilon, save_trace=True,
                                             verbose=False,
                                             count_recompute=True)
     ref = {'train': (F(x), x, G(y), y), 'test': (Fr(xr), xr, G(yr), yr)}
     max_calls = tracer[-1]['n_calls']
 
     if method == 'sinkhorn_precompute':
-        F, G, trace = sinkhorn(x, la, y, lb, n_iter=n_iter, epsilon=epsilon, save_trace=True, ref=ref,
+        F, G, trace = sinkhorn(x, la, y, lb, n_iter=4 * n_iter, epsilon=epsilon, save_trace=True, ref=ref,
                                max_calls=max_calls)
     elif method == 'sinkhorn':
-        F, G, trace = sinkhorn(x, la, y, lb, n_iter=n_iter, epsilon=epsilon, save_trace=True, ref=ref,
+        F, G, trace = sinkhorn(x, la, y, lb, n_iter=4 * n_iter, epsilon=epsilon, save_trace=True, ref=ref,
                                max_calls=max_calls,
                                count_recompute=True)
     elif method == 'subsampled':

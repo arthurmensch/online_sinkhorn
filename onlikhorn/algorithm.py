@@ -285,7 +285,14 @@ def online_sinkhorn(x_sampler=None, y_sampler=None,
         if save_trace:
             this_trace = dict(n_iter=i, n_calls=n_calls, n_samples=n_samples, algorithm='online')
             for name, (fr, xr, gr, yr) in ref.items():
-                this_trace[f'ref_err_{name}'] = (var_norm(F(xr, free=True) - fr) + var_norm(G(yr, free=True) - gr)).item()
+                f = F(xr, free=True)
+                g = G(yr, free=True)
+                this_trace[f'ref_err_{name}'] = (var_norm(f - fr) + var_norm(g - gr)).item()
+
+                gg = FinitePotential(xr, fr - np.log(len(fr)))(yr)
+                ff = FinitePotential(yr, gr - np.log(len(gr)))(xr)
+                this_trace[f'var_err_{name}'] = var_norm(f - ff) + var_norm(g - gg)
+                
             trace.append(this_trace)
             print(' '.join(f'{k}:{v}' for k, v in this_trace.items()))
         if use_finite and force_full:

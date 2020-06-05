@@ -114,7 +114,8 @@ def make_dragon(data_dir=None):
             'http://graphics.stanford.edu/pub/3Dscanrep/dragon/dragon_recon.tar.gz',
             join(data_dir, 'dragon.tar.gz'))
         shutil.unpack_archive(join(data_dir, 'dragon.tar.gz'), data_dir)
-    return load_ply_file(filename, offset=[-0.011, 0.109, -0.008], scale=.04)
+    x, la =  load_ply_file(filename, offset=[-0.011, 0.109, -0.008], scale=.04)
+    return x, torch.full_like(la, fill_value=-np.log(len(x)))
 
 
 def make_gmm_1d():
@@ -181,7 +182,7 @@ def make_data(data_source, n_samples):
         elif data_source == 'gmm_2d':
             x_sampler, y_sampler = make_gmm_2d()
         elif data_source == 'gmm_10d':
-            x_sampler, y_sampler = make_gmm(10, 10)
+            x_sampler, y_sampler = make_gmm(10, 5)
         else:
             raise ValueError
         x, la, _ = x_sampler(n_samples)
