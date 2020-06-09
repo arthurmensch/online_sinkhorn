@@ -47,6 +47,27 @@ class GMMSampler:
                                    dim=1))
 
 
+class GaussianSampler:
+    def __init__(self, mean: torch.tensor, cov: torch.tensor):
+        self.mean = mean
+        self.cov = cov
+        self.gmm = GMMSampler(mean[None, :], cov[None, :], p=torch.ones_like(mean[[0]]))
+
+    def to(self, device):
+        self.gmm.to(device)
+
+    def __call__(self, n):
+        return self.gmm(n)
+
+    @property
+    def dimension(self):
+        return self.gmm.dimension
+
+    def log_prob(self, x):
+        return self.gmm.log_prob(x)
+
+
+
 def load_ply_file(fname, offset=[-0.011, 0.109, -0.008], scale=.04):
     """Loads a .ply mesh to return a collection of weighted Dirac atoms: one per triangle face."""
 

@@ -1,5 +1,5 @@
 import math
-from os.path import expanduser
+from os.path import expanduser, join
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -8,6 +8,18 @@ import torch
 from joblib import Memory
 from matplotlib import gridspec
 
+import matplotlib as mpl
+from matplotlib import rc
+
+from onlikhorn.dataset import get_output_dir
+
+mpl.rcParams['font.size'] = 7
+mpl.rcParams['backend'] = 'pdf'
+rc('text', usetex=True)
+
+pt_width = 397.48499
+pt_per_inch = 72.27
+width = pt_width / pt_per_inch
 
 class Sampler():
     def __init__(self, mean: torch.tensor, cov: torch.tensor, p: torch.tensor):
@@ -276,9 +288,9 @@ def one_dimensional_exp():
     fevals = torch.cat([feval[None, :] for feval in fevals], dim=0)
     gevals = torch.cat([geval[None, :] for geval in gevals], dim=0)
 
-    fig = plt.figure(figsize=(8, 1.9))
+    fig = plt.figure(figsize=(width, .21 * width))
     gs = gridspec.GridSpec(ncols=6, nrows=1, width_ratios=[1, 1.5, 1.5, .8, .8, .8], figure=fig)
-    plt.subplots_adjust(right=0.97, left=0.01)
+    plt.subplots_adjust(right=0.97, left=0.05, bottom=0.27, top=0.85)
     ax0 = fig.add_subplot(gs[0])
     ax0.plot(grid, px, label=r'$\alpha$')
     ax0.plot(grid, py, label=r'$\beta$')
@@ -316,21 +328,26 @@ def one_dimensional_exp():
     colors = plt.cm.get_cmap('Blues')(np.linspace(0.2, 1, len(sto_fevals[::2])))
     for i, eval in enumerate(sto_fevals[::2]):
         ax1.plot(grid, eval, color=colors[i],
-                 linewidth=2, label=None,
+                 linewidth=2, label=f'O-S $n_t={i * 10 * 2 * 50}$' if i % 2 == 0 else None,
                  zorder=1)
     for i, eval in enumerate(sto_gevals[::2]):
         ax2.plot(grid, eval, color=colors[i],
-                 linewidth=2, label=f'O-S $n_t={i * 10 * 2 * 50}$' if i % 2 == 0 else None,
+                 linewidth=2, label=None,
                  zorder=1)
-    ax1.legend(frameon=False, bbox_to_anchor=(0., 1), loc='upper left')
-    ax2.legend(frameon=False, bbox_to_anchor=(0., 1), loc='upper left')
+    for ax in (ax1, ax2, ax3):
+        ax.tick_params(axis='both', which='major', labelsize=5)
+        ax.tick_params(axis='both', which='minor', labelsize=5)
+        ax.minorticks_on()
+    ax1.legend(frameon=False, bbox_to_anchor=(-1, -0.53), ncol=5, loc='lower left')
+    # ax2.legend(frameon=False, bbox_to_anchor=(0., 1), loc='upper left')
     sns.despine(fig)
     for ax in [ax3, ax4, ax5]:
         ax.axis('off')
     ax0.axes.get_yaxis().set_visible(False)
-    plt.savefig('continuous.pdf')
+    plt.savefig(join(get_output_dir(), 'continuous.pdf'))
     plt.show()
 
 
 if __name__ == '__main__':
+    # Figure 2
     one_dimensional_exp()
