@@ -52,8 +52,12 @@ class GaussianSampler:
         self.mean = mean
         self.cov = cov
         self.gmm = GMMSampler(mean[None, :], cov[None, :], p=torch.ones_like(mean[[0]]))
+        self.device = 'cpu'
 
     def to(self, device):
+        self.device = device
+        self.mean = self.mean.to(self.device)
+        self.cov = self.cov.to(self.device)
         self.gmm.to(device)
 
     def __call__(self, n):
@@ -148,6 +152,16 @@ def make_gmm_1d():
     return x_sampler, y_sampler
 
 
+def make_gaussian(dim):
+    mean = torch.zeros(dim)
+    cov = torch.eye(dim)
+    x_sampler = GaussianSampler(mean=mean, cov=cov)
+    mean = torch.ones(dim)
+    cov = torch.eye(dim) * 2
+    y_sampler = GaussianSampler(mean=mean, cov=cov)
+    return x_sampler, y_sampler
+
+
 def make_gmm_2d():
     cov_x = torch.eye(2) * .1, torch.eye(2) * .1, torch.eye(2) * .4
     cov_y = torch.eye(2) * .1, torch.eye(2) * .1, torch.eye(2) * .1
@@ -204,6 +218,10 @@ def make_data(data_source, n_samples):
             x_sampler, y_sampler = make_gmm_2d()
         elif data_source == 'gmm_10d':
             x_sampler, y_sampler = make_gmm(10, 5)
+        elif data_source == 'gaussian_2d':
+            x_sampler, y_sampler = make_gaussian(2)
+        elif data_source == 'gaussian_10d':
+            x_sampler, y_sampler = make_gaussian(10)
         else:
             raise ValueError
         x, la, _ = x_sampler(n_samples)

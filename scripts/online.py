@@ -9,8 +9,9 @@ from sacred.observers import FileStorageObserver
 from onlikhorn.algorithm import sinkhorn, online_sinkhorn, random_sinkhorn, subsampled_sinkhorn, schedule
 from onlikhorn.cache import torch_cached
 from onlikhorn.dataset import get_output_dir, make_data
+from onlikhorn.gaussian import sinkhorn_gaussian
 
-exp_name = 'online_grid12'
+exp_name = 'online_grid_gaussian'
 exp = Experiment(exp_name)
 exp_dir = join(get_output_dir(), exp_name)
 exp.observers = [FileStorageObserver(exp_dir)]
@@ -75,6 +76,28 @@ def debug():
     lr = 1
     refit = True
 
+
+@exp.named_config
+def gaussian():
+    data_source = 'gaussian_2d'
+    n_samples = 1000
+    n_iter = 200
+    max_length = 10000
+    device = 'cuda'
+
+    # Overrided
+    batch_size = 100
+    seed = 0
+    epsilon = 1
+
+    # method = 'online_as_warmup'
+    method = 'online'
+    # method = 'sinkhorn_precompute'
+    batch_exp = 0
+    lr_exp = 1
+    lr = 1
+    refit = False
+
 @exp.named_config
 def debug_dragon():
     data_source = 'dragon'
@@ -114,16 +137,23 @@ def run(data_source, n_samples, epsilon, n_iter, device, method,
     x_sampler.to(device)
     y_sampler.to(device)
 
-    F, G, trace = torch_cached(sinkhorn)(x, la, y, lb, n_iter=4 * n_iter, epsilon=epsilon, save_trace=True,
-                                         verbose=False,
-                                         count_recompute=True)
-    xr, lar, yr, lbr, _, _ = make_data(data_source, n_samples)
-    xr, yr, lar, lbr = xr.to(device), yr.to(device), lar.to(device), lbr.to(device)
-    Fr, Gr, tracer = torch_cached(sinkhorn)(xr, lar, yr, lbr, n_iter=4 * n_iter, epsilon=epsilon, save_trace=True,
-                                            verbose=False,
-                                            count_recompute=True)
-    ref = {'train': (F(x), x, G(y), y), 'test': (Fr(xr), xr, G(yr), yr)}
-    max_calls = tracer[-1]['n_calls']
+    if 'gaussian' in data_source:
+        F, G = sinkhorn_gaussian(x_sampler, y_sampler, epsilon=epsilon)
+        xr, lar, yr, lbr, _, _ = make_data(data_source, n_samples)
+        xr, yr, lar, lbr = xr.to(device), yr.to(device), lar.to(device), lbr.to(device)
+        ref = {'test': (F(xr), xr, G(yr), yr)}
+        max_calls = None
+    else:
+        F, G, trace = torch_cached(sinkhorn)(x, la, y, lb, n_iter=4 * n_iter, epsilon=epsilon, save_trace=True,
+                                             verbose=False,
+                                             count_recompute=True)
+        xr, lar, yr, lbr, _, _ = make_data(data_source, n_samples)
+        xr, yr, lar, lbr = xr.to(device), yr.to(device), lar.to(device), lbr.to(device)
+        Fr, Gr, tracer = torch_cached(sinkhorn)(xr, lar, yr, lbr, n_iter=4 * n_iter, epsilon=epsilon, save_trace=True,
+                                                verbose=False,
+                                                count_recompute=True)
+        ref = {'train': (F(x), x, G(y), y), 'test': (Fr(xr), xr, G(yr), yr)}
+        max_calls = tracer[-1]['n_calls']
 
     if method == 'sinkhorn_precompute':
         F, G, trace = sinkhorn(x, la, y, lb, n_iter=4 * n_iter, epsilon=epsilon, save_trace=True, ref=ref,

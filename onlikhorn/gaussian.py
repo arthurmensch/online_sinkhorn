@@ -21,7 +21,6 @@ class GaussianPotential():
         self.mean = mean
         self.cov = cov
         self.epsilon = epsilon
-        self.sigma = np.sqrt(epsilon)
         self.dimension = self.mean.shape[0]
         self.const = 0
 
