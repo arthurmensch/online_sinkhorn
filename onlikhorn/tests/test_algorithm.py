@@ -8,6 +8,9 @@ import numpy as np
 
 from torch.testing import assert_allclose
 
+from onlikhorn.gaussian import sinkhorn_gaussian
+
+
 @pytest.mark.parametrize("device", ['cpu', 'cuda'])
 @pytest.mark.parametrize("save_trace", [True, False, 'ref'])
 @pytest.mark.parametrize("algorithm", ['sinkhorn', 'subsampled_sinkhorn', 'random_sinkhorn'])
@@ -88,5 +91,17 @@ def test_online_sinkhorn(save_trace, refit, force_full, use_finite, lr, batch_si
         assert (len(trace) == 15)
     else:
         F, G = res
+    assert not np.isnan(F(x).sum().item())
+    assert not np.isnan(G(y).sum().item())
+
+
+@pytest.mark.parametrize("device", ['cpu', 'cuda'])
+def test_gaussian_algorithm(device):
+    if device == 'cuda' and not torch.cuda.is_available():
+        pytest.skip('No cuda')
+    x, la, y, lb, x_sampler, y_sampler = make_data('gaussian_2d', 100)
+    x, la, y, lb, x_sampler, y_sampler = (x.to(device), la.to(device),
+                                          y.to(device), lb.to(device), x_sampler.to(device), y_sampler.to(device))
+    F, G = sinkhorn_gaussian(x_sampler=x_sampler, y_sampler=y_sampler)
     assert not np.isnan(F(x).sum().item())
     assert not np.isnan(G(y).sum().item())

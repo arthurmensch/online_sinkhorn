@@ -59,6 +59,7 @@ class GaussianSampler:
         self.mean = self.mean.to(self.device)
         self.cov = self.cov.to(self.device)
         self.gmm.to(device)
+        return self
 
     def __call__(self, n):
         return self.gmm(n)

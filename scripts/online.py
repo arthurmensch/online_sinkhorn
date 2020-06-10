@@ -11,7 +11,7 @@ from onlikhorn.cache import torch_cached
 from onlikhorn.dataset import get_output_dir, make_data
 from onlikhorn.gaussian import sinkhorn_gaussian
 
-exp_name = 'online_grid_gaussian'
+exp_name = 'online_grid_gaussian_full'
 exp = Experiment(exp_name)
 exp_dir = join(get_output_dir(), exp_name)
 exp.observers = [FileStorageObserver(exp_dir)]
@@ -21,7 +21,6 @@ exp.observers = [FileStorageObserver(exp_dir)]
 def config():
     data_source = 'gmm_1d'
     n_samples = 10000
-    n_iter = 3000
     max_length = 100000
     device = 'cuda'
 
@@ -35,6 +34,11 @@ def config():
     lr_exp = 1
     lr = 1
     refit = True
+
+    n_iter = None
+    max_calls = 1e12
+
+    max_calls = None
 
 @exp.named_config
 def long():
@@ -59,9 +63,9 @@ def long():
 
 @exp.named_config
 def debug():
-    data_source = 'dragon'
+    data_source = 'gmm_2d'
     n_samples = 1000
-    n_iter = 4
+    n_iter = 100
     max_length = 10000
     device = 'cpu'
 
@@ -72,14 +76,34 @@ def debug():
 
     method = 'online'
     batch_exp = 0
-    lr_exp = 0
+    lr_exp = 1
     lr = 1
     refit = True
 
 
 @exp.named_config
+def quiver():
+    data_source = 'gmm_2d'
+    n_samples = 1000
+    n_iter = 10000
+    max_length = 10000
+    device = 'cpu'
+    max_calls = int(5e8)
+
+    # Overrided
+    batch_size = 100
+    seed = 0
+    epsilon = 1e-2
+
+    method = 'online'
+    batch_exp = 0
+    lr_exp = 1
+    lr = 1
+    refit = True
+
+@exp.named_config
 def gaussian():
-    data_source = 'gaussian_2d'
+    data_source = 'gaussian_10d'
     n_samples = 1000
     n_iter = 200
     max_length = 10000
@@ -120,7 +144,7 @@ def debug_dragon():
 
 
 @exp.main
-def run(data_source, n_samples, epsilon, n_iter, device, method,
+def run(data_source, n_samples, epsilon, n_iter, device, method, max_calls,
         batch_exp, batch_size, lr, lr_exp, max_length, refit, _seed, _run):
 
     if refit:
@@ -142,24 +166,24 @@ def run(data_source, n_samples, epsilon, n_iter, device, method,
         xr, lar, yr, lbr, _, _ = make_data(data_source, n_samples)
         xr, yr, lar, lbr = xr.to(device), yr.to(device), lar.to(device), lbr.to(device)
         ref = {'test': (F(xr), xr, G(yr), yr)}
-        max_calls = None
     else:
-        F, G, trace = torch_cached(sinkhorn)(x, la, y, lb, n_iter=4 * n_iter, epsilon=epsilon, save_trace=True,
-                                             verbose=False,
+        F, G, trace = torch_cached(sinkhorn)(x, la, y, lb, n_iter=n_iter, epsilon=epsilon, save_trace=True,
+                                             verbose=False, max_calls=max_calls * 4,
                                              count_recompute=True)
         xr, lar, yr, lbr, _, _ = make_data(data_source, n_samples)
         xr, yr, lar, lbr = xr.to(device), yr.to(device), lar.to(device), lbr.to(device)
-        Fr, Gr, tracer = torch_cached(sinkhorn)(xr, lar, yr, lbr, n_iter=4 * n_iter, epsilon=epsilon, save_trace=True,
-                                                verbose=False,
+        Fr, Gr, tracer = torch_cached(sinkhorn)(xr, lar, yr, lbr, n_iter=n_iter, epsilon=epsilon, save_trace=True,
+                                                verbose=False, max_calls=max_calls * 4,
                                                 count_recompute=True)
         ref = {'train': (F(x), x, G(y), y), 'test': (Fr(xr), xr, G(yr), yr)}
-        max_calls = tracer[-1]['n_calls']
+        if max_calls is None:
+            max_calls = tracer[-1]['n_calls']
 
     if method == 'sinkhorn_precompute':
-        F, G, trace = sinkhorn(x, la, y, lb, n_iter=4 * n_iter, epsilon=epsilon, save_trace=True, ref=ref,
+        F, G, trace = sinkhorn(x, la, y, lb, n_iter=n_iter, epsilon=epsilon, save_trace=True, ref=ref,
                                max_calls=max_calls)
     elif method == 'sinkhorn':
-        F, G, trace = sinkhorn(x, la, y, lb, n_iter=4 * n_iter, epsilon=epsilon, save_trace=True, ref=ref,
+        F, G, trace = sinkhorn(x, la, y, lb, n_iter=n_iter, epsilon=epsilon, save_trace=True, ref=ref,
                                max_calls=max_calls,
                                count_recompute=True)
     elif method == 'subsampled':
@@ -167,7 +191,7 @@ def run(data_source, n_samples, epsilon, n_iter, device, method,
                                           max_calls=max_calls,
                                           epsilon=epsilon, save_trace=True, ref=ref, count_recompute=True)
     elif method == 'random':
-        F, G, trace = random_sinkhorn(x_sampler=x_sampler, y_sampler=y_sampler, n_iter=int(n_iter * len(x) / batch_size),
+        F, G, trace = random_sinkhorn(x_sampler=x_sampler, y_sampler=y_sampler, n_iter=n_iter,
                                       epsilon=epsilon, save_trace=True, ref=ref, use_finite=False,
                                       batch_sizes=batch_size,
                                       max_calls=max_calls)

@@ -25,9 +25,9 @@ class GaussianPotential():
         self.const = 0
 
     def refit(self, G):
-        C = symsqrt(self.cov @ G.cov + (self.epsilon / 2) ** 2 * torch.eye(self.dimension))
-        self.U = (G.cov @ torch.inverse(C + self.epsilon / 2 * torch.eye(self.dimension)) - torch.eye(
-            self.dimension)) / self.epsilon
+        Id = torch.eye(self.dimension, device=self.mean.device)
+        C = symsqrt(self.cov @ G.cov + (self.epsilon / 2) ** 2 * Id)
+        self.U = (G.cov @ torch.inverse(C + self.epsilon / 2 * Id) - Id) / self.epsilon
         self.other_mean = G.mean
 
     def __call__(self, x):
@@ -44,7 +44,7 @@ def sinkhorn_gaussian(x_sampler: GaussianSampler, y_sampler: GaussianSampler, ep
     G = GaussianPotential(y_sampler.mean, y_sampler.cov, epsilon=epsilon)
     F.refit(G)
     G.refit(F)
-    anchor = F(torch.zeros((1, x_sampler.dimension)))
+    anchor = F(torch.zeros((1, x_sampler.dimension), device=x_sampler.device))
     F.add_weight(anchor)
     G.add_weight(-anchor)
     return F, G

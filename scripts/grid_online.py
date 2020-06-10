@@ -46,7 +46,8 @@ def create_one(config, index=0):
                                       filename=filename, config_str=config_str))
     return filename
 
-grid = 'warmup'
+
+grid = 'quiver'
 
 if grid == 'online':
     n_seeds = 3
@@ -91,7 +92,7 @@ if grid == 'online':
 
 
 # Dragon online warmup
-if grid == 'warmup':
+elif grid == 'warmup':
     n_seeds = 3
     seeds = list(range(n_seeds))
     epsilons = [1e-4, 1e-3, 1e-2, 1e-1]
@@ -111,6 +112,72 @@ if grid == 'warmup':
                             'lr_exp': [0, .5, 1]})
 
     grids = [reference, online]
+
+elif grid == 'gaussian':
+    n_seeds = 3
+    seeds = list(range(n_seeds))
+    epsilons = [1e-4, 1e-3, 1e-2, 1e-1]
+    data_sources = ['gaussian_2d', 'gaussian_10d']
+    reference = ParameterGrid({'data_source': data_sources,
+                               'seed': seeds,
+                               'epsilon': epsilons,
+                               'method': ['sinkhorn'],
+                               })
+    subsampled = ParameterGrid({'data_source': data_sources,
+                                'batch_size': [100, 1000],
+                                'seed': seeds,
+                                'epsilon': epsilons,
+                                'method': ['subsampled'],
+                                })
+    random = ParameterGrid({'data_source': data_sources,
+                            'batch_size': [100, 1000],
+                            'seed': seeds,
+                            'epsilon': epsilons,
+                            'method': ['random'],
+                            })
+    online_non_convergent = ParameterGrid({'data_source': data_sources,
+                                           'batch_size': [100],
+                                           'seed': seeds,
+                                           'epsilon': epsilons,
+                                           'method': ['online'],
+                                           'refit': [False, True],
+                                           'batch_exp': [0],
+                                           'lr_exp': [0, .5, 1]})
+    online = ParameterGrid({'data_source': data_sources,
+                            'batch_size': [100],
+                            'seed': seeds,
+                            'epsilon': epsilons,
+                            'method': ['online'],
+                            'refit': [True, False],
+                            'batch_exp': [0, .5, 1],
+                            'lr_exp': ['auto']})
+    grids = [reference, subsampled, random, online_non_convergent, online]
+
+elif grid == 'quiver':
+    n_seeds = 1
+    seeds = list(range(n_seeds))
+    epsilons = [1e-3]
+    data_sources = ['gmm_2d']
+    reference = ParameterGrid({'data_source': data_sources,
+                               'n_samples': [10000],
+                               'seed': seeds,
+                               'epsilon': epsilons,
+                               'n_iter': [10000],
+                               'max_calls': [1e10],
+                               'method': ['sinkhorn'],
+                               })
+    compete = ParameterGrid({'data_source': data_sources,
+                             'n_samples': [1000],
+                             'batch_size': [10],
+                             'n_iter': [10000],
+                             'seed': seeds,
+                             'epsilon': epsilons,
+                             'max_calls': [1e8],
+                             'method': ['sinkhorn', 'online'],
+                             'batch_exp': [0, .5, 1],
+                             'lr_exp': ['auto']
+                             })
+    grids = [reference, compete]
 
 job_folder = join(get_output_dir(), 'online', 'jobs')
 project_root = os.path.abspath(os.getcwd())

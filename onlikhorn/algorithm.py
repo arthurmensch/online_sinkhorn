@@ -189,6 +189,10 @@ def sinkhorn(x, la, y, lb, n_iter=100, epsilon=1., save_trace=False, F=None, G=N
     if G is None:
         G = FinitePotential(x, la.clone(), epsilon=epsilon, force_count_compute=count_recompute)
 
+    if n_iter is None:
+        assert max_calls is not None
+        n_iter = 1e6
+
     if precompute_C:
         Cxy = compute_distance(x, y)
         Cyx = Cxy.T
@@ -241,6 +245,10 @@ def online_sinkhorn(x_sampler=None, y_sampler=None,
                     n_iter=100, force_full=True,
                     batch_sizes: Optional[Union[List[int], int]] = 10, max_calls=None,
                     lrs: Union[List[float], float] = .1, save_trace=False, ref=None):
+    if n_iter is None:
+        assert max_calls is not None
+        n_iter = 1e6
+
     if not isinstance(batch_sizes, int) or not isinstance(batch_sizes, int):
         if not isinstance(batch_sizes, int):
             n_iter = len(batch_sizes)
@@ -351,6 +359,10 @@ def random_sinkhorn(x_sampler=None, y_sampler=None, x=None, la=None, y=None, lb=
                     epsilon=1, max_calls=None,
                     batch_sizes: Union[List[int], int] = 10, save_trace=False, ref=None):
     trace, ref = check_trace(save_trace, ref=ref, ref_needed=True)
+
+    if n_iter is None:
+        assert max_calls is not None
+        n_iter = 1e6
 
     if isinstance(batch_sizes, int):
         batch_sizes = [batch_sizes for _ in range(n_iter)]
