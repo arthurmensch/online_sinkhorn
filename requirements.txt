@@ -1,0 +1,7 @@
+numpy
+pytorch
+sacred
+matplotlib
+seaborn
+scikit-learn
+scipy

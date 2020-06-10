@@ -5,9 +5,9 @@ from setuptools import find_packages
 
 DISTNAME = 'onlikhorn'
 DESCRIPTION = "Online Sinkhorn algorithm"
-MAINTAINER = 'Arthur Mensch'
-MAINTAINER_EMAIL = 'arthur.mensch@gmail.com'
-URL = 'github.com/arthurmensch/online_sinkhorn'
+MAINTAINER = 'XXX'
+MAINTAINER_EMAIL = 'XXX'
+URL = 'XXX'
 LICENSE = 'MIT License'
 DOWNLOAD_URL = ''
 VERSION = '0.1.dev0'

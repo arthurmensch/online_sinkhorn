@@ -6,12 +6,10 @@ from os.path import join
 from sklearn.model_selection import ParameterGrid
 
 from onlikhorn.dataset import get_output_dir
-import numpy as np
 
 SLURM_TEMPLATE = """#!/bin/env bash
 #SBATCH --job-name=online
 #SBATCH --ntasks=1
-#SBATCH --gres=gpu:1
 
 #SBATCH --cpus-per-task=1
 #SBATCH --mem-per-cpu=20G
@@ -21,9 +19,6 @@ SLURM_TEMPLATE = """#!/bin/env bash
 #SBATCH --output=%x_%A_%a.out
 #SBATCH --error=%x_%A_%a.out
 
-#SBATCH --partition=gpu_p2
-#SBATCH --qos=qos_gpu-t3
-#SBATCH -A glp@gpu
 #SBATCH --array=0-{nb_jobs}
 
 source load_modules
