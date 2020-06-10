@@ -278,6 +278,63 @@ def plot_online(df, ytype='test', epsilon=1e-2, refit=False, name=''):
     fig.savefig(join(get_output_dir(), f'online_{epsilon}_{refit}_{ytype}_{name}.pdf'))
 
 
+def plot_random(df, ytype='test', epsilon=1e-2, name=''):
+    df = df.query('(method in ["random", "sinkhorn", "subsampled"]) & data_source != "dragon" &'
+                  f'epsilon == {epsilon}')
+
+    pk = ['data_source', 'epsilon', 'method', 'refit', 'batch_exp', 'lr_exp', 'batch_size', 'n_iter']
+    df = df.groupby(by=pk).agg(['mean', 'std']).reset_index('n_iter')
+
+    NAMES = {'gmm_1d': '1D GMM', 'gmm_10d': '10D GMM', 'gmm_2d': '2D GMM'}
+
+    df1 = df
+    fig, axes = plt.subplots(1, 3, figsize=(width, width * 0.2))
+    order = {'gmm_1d': 0, 'gmm_10d': 2, 'gmm_2d': 1}
+    for (data_source, epsilon), df2 in df1.groupby(['data_source', 'epsilon']):
+        iter_at_prec = {}
+        for index, df3 in df2.groupby(['method', 'refit', 'batch_exp', 'lr_exp', 'batch_size']):
+            n_calls = df3['n_calls']
+            if ytype == 'train':
+                y = df3['ref_err_train']
+            elif ytype == 'test':
+                y = df3['ref_err_test']
+            elif ytype == 'err':
+                y = df3['fixed_err']
+            else:
+                raise ValueError
+            if index[0] == 'sinkhorn':
+                label = 'Sinkhorn $n = 10^4$'
+            elif index[0] == 'subsampled':
+                label = f'Sinkhorn $n = {index[-1]}$'
+            else:
+                if index[2] == 0:
+                    label = f'R-S $n = {index[-1]}$'
+                else:
+                    label = f'R-S $n = {index[-1]}$'
+            axes[order[data_source]].plot(n_calls['mean'], y['mean'], label=label, linewidth=2, alpha=0.8)
+
+        axes[order[data_source]].annotate(NAMES[data_source], xy=(.5, .83), xycoords="axes fraction",
+                         ha='center', va='bottom')
+    axes[0].annotate('Computations', xy=(-.3, -.25), xycoords="axes fraction",
+                     ha='center', va='bottom')
+    axes[2].legend(loc='center left', frameon=False, bbox_to_anchor=(1.03, 0.5), ncol=1)
+    for ax in axes:
+        ax.set_xscale('log')
+        ax.set_yscale('log')
+        ax.tick_params(axis='both', which='major', labelsize=5)
+        ax.tick_params(axis='both', which='minor', labelsize=5)
+        ax.minorticks_on()
+    if ytype == 'err':
+        axes[0].set_ylabel(r'$\Vert T(\hat f){-}\hat g\Vert_{\textrm{var}}$', fontsize=5)
+    elif ytype == 'train':
+        axes[0].set_ylabel(r'$\Vert \hat f {-} f^\star\Vert_{\textrm{var}}$', fontsize=5)
+    else:
+        axes[0].set_ylabel(r'$\Vert \hat f {-} f_0^\star\Vert_{\textrm{var}}$', fontsize=5)
+    sns.despine(fig)
+    fig.subplots_adjust(right=0.75, bottom=0.21)
+    fig.savefig(join(get_output_dir(), f'random_{epsilon}_{ytype}_{name}.pdf'))
+
+
 def plot_gaussian(df, ytype='test', epsilon=1e-2, refit=False):
     df = df.query('(method in ["online", "sinkhorn", "subsampled"]) & data_source != "dragon" &'
                   f'(method != "online" | (refit ==  {refit} & lr_exp == "auto")) &'
@@ -338,7 +395,7 @@ def plot_gaussian(df, ytype='test', epsilon=1e-2, refit=False):
     fig.subplots_adjust(right=0.75, bottom=0.21)
     fig.savefig(join(get_output_dir(), f'online_{epsilon}_{refit}_{ytype}_gaussian.pdf'))
 
-pipeline = ['quiver']
+pipeline = ['random']
 
 if 'gather' in pipeline:
     output_dirs = [join(get_output_dir(), 'online_grid12')]
@@ -353,6 +410,14 @@ if 'figure_1' in pipeline:
         for epsilon in np.logspace(-4, -1, 4):
             for refit in [False, True]:
                 plot_online(df, refit=refit, epsilon=epsilon, ytype=ytype)
+    del df
+
+if 'random' in pipeline:
+    output_dirs = [join(get_output_dir(), 'online_grid10'), join(get_output_dir(), 'online_grid11')]
+    df = pd.read_pickle(join(get_output_dir(), 'all.pkl'))
+    for ytype in ['test']:
+        for epsilon in np.logspace(-4, -1, 4):
+            plot_random(df, epsilon=epsilon, ytype=ytype)
     del df
 # #
 # Figure 3

@@ -299,7 +299,7 @@ def online_sinkhorn(x_sampler=None, y_sampler=None,
 
                 gg = FinitePotential(xr, fr - np.log(len(fr)))(yr)
                 ff = FinitePotential(yr, gr - np.log(len(gr)))(xr)
-                this_trace[f'fixed_err_{name}'] = var_norm(f - ff) + var_norm(g - gg)
+                this_trace[f'fixed_err_{name}'] = (var_norm(f - ff) + var_norm(g - gg)).item()
                 
             trace.append(this_trace)
             print(' '.join(f'{k}:{v}' for k, v in this_trace.items()))
