@@ -27,12 +27,12 @@ class GaussianPotential():
     def refit(self, G):
         Id = torch.eye(self.dimension, device=self.mean.device)
         C = symsqrt(self.cov @ G.cov + (self.epsilon / 2) ** 2 * Id)
-        self.U = (G.cov @ torch.inverse(C + self.epsilon / 2 * Id) - Id) / self.epsilon
+        self.U = G.cov @ torch.inverse(C + self.epsilon / 2 * Id) - Id
         self.other_mean = G.mean
 
     def __call__(self, x):
         centered = x - self.mean[None, :]
-        return (- .5 * self.epsilon * torch.sum((centered @ self.U) * centered, dim=1)
+        return (- .5 * torch.sum((centered @ self.U) * centered, dim=1)
                 + torch.sum(x * (self.mean - self.other_mean), dim=1))
 
     def add_weight(self, weight):

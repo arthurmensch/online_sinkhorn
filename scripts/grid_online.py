@@ -163,21 +163,30 @@ elif grid == 'quiver':
                                'seed': seeds,
                                'epsilon': epsilons,
                                'n_iter': [10000],
-                               'max_calls': [1e10],
+                               'max_calls': [1e11],
                                'method': ['sinkhorn'],
                                })
     compete = ParameterGrid({'data_source': data_sources,
-                             'n_samples': [1000],
-                             'batch_size': [10],
+                             'n_samples': [10000],
+                             'batch_size': [10, 100],
                              'n_iter': [10000],
                              'seed': seeds,
                              'epsilon': epsilons,
                              'max_calls': [1e8],
-                             'method': ['sinkhorn', 'online'],
+                             'method': ['online'],
                              'batch_exp': [0, .5, 1],
                              'lr_exp': ['auto']
                              })
-    grids = [reference, compete]
+    subsampled = ParameterGrid({'data_source': data_sources,
+                                'n_samples': [1000],
+                                'batch_size': [10],
+                                'n_iter': [10000],
+                                'seed': seeds,
+                                'epsilon': epsilons,
+                                'max_calls': [1e8],
+                                'method': ['sinkhorn'],
+                                })
+    grids = [reference, compete, subsampled]
 
 job_folder = join(get_output_dir(), 'online', 'jobs')
 project_root = os.path.abspath(os.getcwd())

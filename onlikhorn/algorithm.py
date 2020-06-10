@@ -191,7 +191,7 @@ def sinkhorn(x, la, y, lb, n_iter=100, epsilon=1., save_trace=False, F=None, G=N
 
     if n_iter is None:
         assert max_calls is not None
-        n_iter = 1e6
+        n_iter = int(1e6)
 
     if precompute_C:
         Cxy = compute_distance(x, y)
@@ -247,7 +247,7 @@ def online_sinkhorn(x_sampler=None, y_sampler=None,
                     lrs: Union[List[float], float] = .1, save_trace=False, ref=None):
     if n_iter is None:
         assert max_calls is not None
-        n_iter = 1e6
+        n_iter = int(1e6)
 
     if not isinstance(batch_sizes, int) or not isinstance(batch_sizes, int):
         if not isinstance(batch_sizes, int):
@@ -362,7 +362,7 @@ def random_sinkhorn(x_sampler=None, y_sampler=None, x=None, la=None, y=None, lb=
 
     if n_iter is None:
         assert max_calls is not None
-        n_iter = 1e6
+        n_iter = int(1e6)
 
     if isinstance(batch_sizes, int):
         batch_sizes = [batch_sizes for _ in range(n_iter)]
@@ -397,7 +397,7 @@ def random_sinkhorn(x_sampler=None, y_sampler=None, x=None, la=None, y=None, lb=
 
 
 def schedule(batch_exp, batch_size, lr, lr_exp, max_length, n_iter, refit, iota=.1):
-    batch_sizes = np.ceil(batch_size * np.float_power(np.linspace(1., n_iter / 10, n_iter), batch_exp)).astype(int)  # Those are important hyperparameters...
+    batch_sizes = np.ceil(batch_size * np.float_power(1 + 0.1 * np.arange(n_iter, dtype=float), batch_exp)).astype(int)  # Those are important hyperparameters...
     batch_sizes[batch_sizes > max_length] = max_length
     batch_sizes = batch_sizes.tolist()
     if lr_exp == 'auto':
@@ -405,5 +405,5 @@ def schedule(batch_exp, batch_size, lr, lr_exp, max_length, n_iter, refit, iota=
             lr_exp = min(max(0, 1 - batch_exp / 2 + iota), 1)
         else:
             lr_exp = min(max(0, 1 - (batch_exp + 1) / 2 + iota), 1)
-    lrs = (lr * np.float_power(np.linspace(1, n_iter / 10, n_iter), -lr_exp)).tolist()
+    lrs = (lr * np.float_power(1 + 0.1 * np.arange(n_iter, dtype=float), -lr_exp)).tolist()
     return batch_sizes, lrs, lr_exp

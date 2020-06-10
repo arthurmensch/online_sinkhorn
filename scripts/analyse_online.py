@@ -83,16 +83,18 @@ def plot_quiver(output_dir, exp_dir):
     res = torch.load(join(output_dir, str(exp_dir), 'artifacts', 'results.pkl'), map_location=torch.device('cpu'))
     F, x, G, y = res['F'], res['x'], res['G'], res['y']
     print(len(x))
-
+    torch.manual_seed(122)
+    np.random.seed(122)
     x_sampler, y_sampler = make_gmm_2d()
-
+    xr, lar, _ = x_sampler(1000)
+    yr, lbr, _ = y_sampler(1000)
     shape = (100, 100)
     z = make_2d_grid(shape)
     llx = x_sampler.log_prob(z)
     lly = y_sampler.log_prob(z)
 
-    grad_f = compute_grad(F, x)
-    grad_g = compute_grad(G, y)
+    grad_f = compute_grad(F, xr)
+    grad_g = compute_grad(G, yr)
 
     grad_fgrid = compute_grad(F, z)
     grad_ggrid = compute_grad(G, z)
@@ -101,20 +103,30 @@ def plot_quiver(output_dir, exp_dir):
     method = config['method']
     n_samples = config['n_samples']
     batch_exp = config['batch_exp']
+    print(batch_exp)
     batch_size = config['batch_size']
+    max_calls = config['max_calls']
+    annotate = False
     if method == 'sinkhorn':
-        name = f'Sinkhorn N={n_samples}'
+        name = rf'Sinkhorn N={n_samples},\quad$10^{{{np.log10(max_calls):.0f}}}$ computations'
+        if n_samples == 10000:
+            annotate = True
     else:
-        name = rf'Online Sinkhorn $n(t) \propto t^{{{batch_exp}}}$'
+        name = rf'Online Sinkhorn $n(t) \propto {batch_size} t^{{{batch_exp:.1f}}}$,\quad'\
+               rf'$10^{{{np.log10(max_calls):.0f}}}$ computations'
 
     fig, axes = plt.subplots(1, 2, sharex=True, sharey=True, figsize=(width, width * .5))
 
     axes[0].contour(z[:, 0].view(shape), z[:, 1].view(shape), llx.view(shape), zorder=0, levels=7, cmap='Reds')
-    axes[0].scatter(x[:, 0], x[:, 1], 2, zorder=10, color='C3')
-    axes[0].quiver(x[:, 0], x[:, 1], grad_f[:, 0], grad_f[:, 1], zorder=20, scale=50)
+    axes[0].scatter(xr[:, 0], xr[:, 1], 2, zorder=20, color='C3')
+    axes[0].quiver(xr[:, 0], xr[:, 1], grad_f[:, 0], grad_f[:, 1], zorder=30, scale=50)
 
     axes[0].contour(z[:, 0].view(shape), z[:, 1].view(shape), lly.view(shape), zorder=0, levels=7, cmap='Blues')
-    axes[0].scatter(y[:, 0], y[:, 1], 2, zorder=10, color='C0')
+    axes[0].scatter(yr[:, 0], yr[:, 1], 2, zorder=10, color='C0')
+    if annotate:
+        axes[0].annotate('Reg. OT displacement field\n'
+                         'on empirical samples', xy=(.5, 0), xycoords='axes fraction',
+                         textcoords='offset points', xytext=(0, -10), ha='center', va='top', fontsize=9)
     # axes[0, 0].quiver(y[:, 0], y[:, 1], grad_g[:, 0], grad_g[:, 1], zorder=20)
 
     scale = .3
@@ -122,11 +134,15 @@ def plot_quiver(output_dir, exp_dir):
     axes[1].quiver(z[:, 0], z[:, 1], grad_fgrid[:, 0] * llx.exp(), grad_fgrid[:, 1] * llx.exp(), scale=3, zorder=20)
 
     axes[1].contour(z[:, 0].view(shape), z[:, 1].view(shape), lly.view(shape), zorder=0, levels=7, cmap='Blues')
+    if annotate:
+        axes[1].annotate('Reg. OT displacement field\n on a regular grid', xy=(.5, 0), xycoords='axes fraction',
+                         textcoords='offset points', xytext=(0, -10), ha='center', va='top', fontsize=9)
     # axes[1, 0].quiver(z[:, 0], z[:, 1], grad_ggrid[:, 0] * lly.exp(), grad_ggrid[:, 1] * lly.exp(), zorder=20)
     for ax in axes:
         ax.axis('off')
-    fig.suptitle(name)
-    plt.show()
+    fig.suptitle(name, fontsize=9)
+    fig.subplots_adjust(bottom=0.2)
+    plt.savefig(join(output_dir, f'quiver_{name}.pdf'))
 
 def plot_warmup(df, ytype='err', epsilon=1e-2):
     df = df.query('(method in ["sinkhorn_precompute", "online_as_warmup"]) & '
@@ -190,11 +206,11 @@ def plot_warmup(df, ytype='err', epsilon=1e-2):
         # ax.set_xlim([0.8e9, 1.2e11])
         # ax.set_xticks([1e9, 1e10, 1e11])
     if ytype == 'err':
-        axes[0].set_ylabel(r'$\Vert T(\hat f){-} \hat g\Vert_{\textrm{var}} +$', fontsize=5)
+        axes[0].set_ylabel(r'$\Vert T(\hat f){-} \hat g\Vert_{\textrm{var}}$', fontsize=5)
     elif ytype == 'train':
-        axes[0].set_ylabel(r'$\Vert \hat f {-} f^\star\Vert_{\textrm{var}} +$', fontsize=5)
+        axes[0].set_ylabel(r'$\Vert \hat f {-} f^\star\Vert_{\textrm{var}}$', fontsize=5)
     else:
-        axes[0].set_ylabel('$\Vert f {-} f_0^\star\Vert_{\textrm{var}} +$', fontsize=5)
+        axes[0].set_ylabel('$\Vert f {-} f_0^\star\Vert_{\textrm{var}}$', fontsize=5)
     sns.despine(fig)
     fig.subplots_adjust(right=0.8, bottom=0.23)
     fig.savefig(join(get_output_dir(), f'online+full_{epsilon}_{ytype}.pdf'))
@@ -252,11 +268,11 @@ def plot_online(df, ytype='test', epsilon=1e-2, refit=False, name=''):
         ax.tick_params(axis='both', which='minor', labelsize=5)
         ax.minorticks_on()
     if ytype == 'err':
-        axes[0].set_ylabel(r'$\Vert T(\hat f){-}\hat g\Vert_{\textrm{var}} +$', fontsize=5)
+        axes[0].set_ylabel(r'$\Vert T(\hat f){-}\hat g\Vert_{\textrm{var}}$', fontsize=5)
     elif ytype == 'train':
-        axes[0].set_ylabel(r'$\Vert \hat f {-} f^\star\Vert_{\textrm{var}}$ +$', fontsize=5)
+        axes[0].set_ylabel(r'$\Vert \hat f {-} f^\star\Vert_{\textrm{var}}$', fontsize=5)
     else:
-        axes[0].set_ylabel(r'$\Vert \hat f {-} f_0^\star\Vert_{\textrm{var}} +$', fontsize=5)
+        axes[0].set_ylabel(r'$\Vert \hat f {-} f_0^\star\Vert_{\textrm{var}}$', fontsize=5)
     sns.despine(fig)
     fig.subplots_adjust(right=0.75, bottom=0.21)
     fig.savefig(join(get_output_dir(), f'online_{epsilon}_{refit}_{ytype}_{name}.pdf'))
@@ -303,7 +319,7 @@ def plot_gaussian(df, ytype='test', epsilon=1e-2, refit=False):
 
         axes[order[data_source]].annotate(NAMES[data_source], xy=(.5, .83), xycoords="axes fraction",
                          ha='center', va='bottom')
-    axes[0].annotate('Computations', xy=(-.3, -.25), xycoords="axes fraction",
+    axes[0].annotate('Computations', xy=(-.2, -.25), xycoords="axes fraction",
                      ha='center', va='bottom')
     axes[1].legend(loc='center left', frameon=False, bbox_to_anchor=(1.03, 0.5), ncol=1)
     for ax in axes:
@@ -313,16 +329,16 @@ def plot_gaussian(df, ytype='test', epsilon=1e-2, refit=False):
         ax.tick_params(axis='both', which='minor', labelsize=5)
         ax.minorticks_on()
     if ytype == 'err':
-        axes[0].set_ylabel(r'$\Vert T(\hat f){-}\hat g\Vert_{\textrm{var}} +$', fontsize=5)
+        axes[0].set_ylabel(r'$\Vert T(\hat f){-}\hat g\Vert_{\textrm{var}}$', fontsize=5)
     elif ytype == 'train':
-        axes[0].set_ylabel(r'$\Vert \hat f {-} f^\star\Vert_{\textrm{var}}$ +$', fontsize=5)
+        axes[0].set_ylabel(r'$\Vert \hat f {-} f^\star\Vert_{\textrm{var}}$', fontsize=5)
     else:
-        axes[0].set_ylabel(r'$\Vert \hat f {-} f_0^\star\Vert_{\textrm{var}} +$', fontsize=5)
+        axes[0].set_ylabel(r'$\Vert \hat f {-} f^\star\Vert_{\textrm{var}}$', fontsize=5)
     sns.despine(fig)
     fig.subplots_adjust(right=0.75, bottom=0.21)
     fig.savefig(join(get_output_dir(), f'online_{epsilon}_{refit}_{ytype}_gaussian.pdf'))
 
-pipeline = ['figure_gaussian']
+pipeline = ['quiver']
 
 if 'gather' in pipeline:
     output_dirs = [join(get_output_dir(), 'online_grid12')]
@@ -370,8 +386,8 @@ if 'figure_gaussian' in pipeline:
     del df
 
 if 'quiver' in pipeline:
-    output_dir = join(get_output_dir(), 'online_grid_quiver')
+    output_dir = join(get_output_dir(), 'online_grid_quiver_2')
     # for exp_dir in [7, 11]:   # Subsampled, online
     # for exp_dir in [15, 16]:   # Subsampled, online
-    for exp_dir in [4, 5, 6]:   # Subsampled, online
+    for exp_dir in range(17, 17 + 8):   # Subsampled, online
         plot_quiver(output_dir, exp_dir)

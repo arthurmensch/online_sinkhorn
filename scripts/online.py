@@ -11,7 +11,7 @@ from onlikhorn.cache import torch_cached
 from onlikhorn.dataset import get_output_dir, make_data
 from onlikhorn.gaussian import sinkhorn_gaussian
 
-exp_name = 'online_grid_gaussian_full'
+exp_name = 'online_grid_quiver_2'
 exp = Experiment(exp_name)
 exp_dir = join(get_output_dir(), exp_name)
 exp.observers = [FileStorageObserver(exp_dir)]
@@ -21,7 +21,7 @@ exp.observers = [FileStorageObserver(exp_dir)]
 def config():
     data_source = 'gmm_1d'
     n_samples = 10000
-    max_length = 100000
+    max_length = 20000
     device = 'cuda'
 
     # Overrided
@@ -37,8 +37,6 @@ def config():
 
     n_iter = None
     max_calls = 1e12
-
-    max_calls = None
 
 @exp.named_config
 def long():
@@ -63,11 +61,13 @@ def long():
 
 @exp.named_config
 def debug():
-    data_source = 'gmm_2d'
+    data_source = 'gaussian_2d'
     n_samples = 1000
-    n_iter = 100
     max_length = 10000
     device = 'cpu'
+
+    n_iter = None
+    max_calls = 1e8
 
     # Overrided
     batch_size = 10
@@ -196,6 +196,8 @@ def run(data_source, n_samples, epsilon, n_iter, device, method, max_calls,
                                       batch_sizes=batch_size,
                                       max_calls=max_calls)
     elif method in ['online', 'online_on_finite', 'online_as_warmup']:
+        if n_iter is None:
+            n_iter = int(1e6)
         batch_sizes, lrs, lr_exp = schedule(batch_exp, batch_size, lr, lr_exp, max_length, n_iter, refit)
         print(f'Using lr_exp={lr_exp}')
         _run.info['lr_exp'] = lr_exp
