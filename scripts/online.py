@@ -62,9 +62,9 @@ def long():
 @exp.named_config
 def debug():
     data_source = 'gaussian_2d'
-    n_samples = 1000
+    n_samples = 100
     max_length = 10000
-    device = 'cpu'
+    device = 'cuda'
 
     n_iter = None
     max_calls = 1e8
@@ -72,10 +72,10 @@ def debug():
     # Overrided
     batch_size = 10
     seed = 0
-    epsilon = 1e-2
+    epsilon = 1e-3
 
     method = 'online'
-    batch_exp = 0
+    batch_exp = 0.5
     lr_exp = 1
     lr = 1
     refit = True

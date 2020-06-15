@@ -3,6 +3,8 @@ from typing import Optional, Union, List
 
 import numpy as np
 import torch
+from pykeops.torch import LazyTensor
+
 from onlikhorn.data import Subsampler
 
 
@@ -17,10 +19,15 @@ def var_norm(v):
     return v.max() - v.min()
 
 
-def compute_distance(x, y):
-    x2 = torch.sum(x ** 2, dim=1)
-    y2 = torch.sum(y ** 2, dim=1)
-    return .5 * (x2[:, None] + y2[None, :] - 2 * x @ y.transpose(0, 1))
+def compute_distance(x, y, use_pykeops=False):
+    if use_pykeops:
+        x = LazyTensor(x[:, None, :])
+        y = LazyTensor(y[None, :, :])
+        return (((x - y) ** 2) / 2).sum(dim=2)
+    else:
+        x2 = torch.sum(x ** 2, dim=1)
+        y2 = torch.sum(y ** 2, dim=1)
+        return .5 * (x2[:, None] + y2[None, :] - 2 * x @ y.transpose(0, 1))[..., None]
 
 
 def logaddexp(x, y):
@@ -37,11 +44,14 @@ def check_idx(n, idx):
 
 
 class BasePotential:
-    def __init__(self, positions: torch.Tensor, weights: torch.tensor, epsilon=1., force_count_compute=False):
+    def __init__(self, positions: torch.Tensor, weights: torch.tensor, epsilon=1., force_count_compute=False,
+                 use_pykeops=False):
         self.positions = positions
         self.weights = weights
         self.epsilon = epsilon
         self.seen = slice(None)
+
+        self.use_pykeops = use_pykeops
 
         self.force_count_compute = force_count_compute
 
@@ -56,11 +66,12 @@ class BasePotential:
 
     def __call__(self, positions: torch.tensor = None, C=None, free=False, free_scaling=False, free_compute=False):
         """Evaluation"""
+        use_pykeops = self.positions.device.type == 'cuda' and C is None
         if free:  # hacks as the implementation of memory persistence is not finished
             free_scaling = True
             free_compute = True
         if C is None:
-            C = compute_distance(positions, self.positions[self.seen])
+            C = compute_distance(positions, self.positions[self.seen], use_pykeops=use_pykeops)
         elif not self.force_count_compute:
             free_compute = True
 
@@ -68,13 +79,20 @@ class BasePotential:
             self.n_calls_ += C.shape[0] * C.shape[1] * self.positions.shape[1]
         if not free_scaling:
             self.n_calls_ += C.shape[0] * C.shape[1]
-
-        return - self.epsilon * torch.logsumexp((self.weights[None, self.seen] - C) / self.epsilon, dim=1)
+        weights = self.weights[None, self.seen, None]
+        if use_pykeops:
+            weights = LazyTensor(weights)
+        weighted_C = (weights - C) / self.epsilon
+        return - self.epsilon * weighted_C.logsumexp(dim=1)[..., 0]
 
     def to(self, device):
         self.weights = self.weights.to(device)
         self.positions = self.positions.to(device)
         return self
+
+    @property
+    def device(self):
+        return self.positions.device
 
     def cpu(self):
         return self.to('cpu')
@@ -195,7 +213,7 @@ def sinkhorn(x, la, y, lb, n_iter=100, epsilon=1., save_trace=False, F=None, G=N
 
     if precompute_C:
         Cxy = compute_distance(x, y)
-        Cyx = Cxy.T
+        Cyx = Cxy.transpose(0, 1)
         if not precompute_for_free and not count_recompute:  # Count compute only once
             F.n_calls_ += x.shape[0] * y.shape[0] * x.shape[1]
     else:
@@ -263,8 +281,8 @@ def online_sinkhorn(x_sampler=None, y_sampler=None,
     if use_finite:
         x_sampler = Subsampler(x, la)
         y_sampler = Subsampler(y, lb)
-        F = FinitePotential(y, epsilon=epsilon)
-        G = FinitePotential(x, epsilon=epsilon)
+        F = FinitePotential(y, epsilon=epsilon).to(x_sampler.device)
+        G = FinitePotential(x, epsilon=epsilon).to(y_sampler.device)
     else:
         if x_sampler is None:
             x_sampler = Subsampler(x, la)
@@ -336,9 +354,9 @@ def online_sinkhorn(x_sampler=None, y_sampler=None,
     F.add_weight(anchor)
     G.add_weight(-anchor)
     if save_trace:
-        return F.cpu(), G.cpu(), trace
+        return F, G, trace
     else:
-        return F.cpu(), G.cpu()
+        return F, G
 
 
 def check_trace(save_trace=False, trace=None, ref=None, ref_needed=False):
