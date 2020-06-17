@@ -59,6 +59,8 @@ def test_precompute_C():
 def test_online_sinkhorn(save_trace, refit, force_full, use_finite, lr, batch_size, device):
     if device == 'cuda' and not torch.cuda.is_available():
         pytest.skip('No cuda')
+    if not use_finite and force_full:
+        pytest.skip('Invalid configuration')
     x, la, y, lb, x_sampler, y_sampler = make_data('gmm_1d', 10)
     x, la, y, lb, x_sampler, y_sampler = (x.to(device), la.to(device),
                                           y.to(device), lb.to(device), x_sampler.to(device), y_sampler.to(device))

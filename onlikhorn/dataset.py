@@ -131,10 +131,14 @@ def get_output_dir():
     return output_dir
 
 
-def make_dragon(data_dir=None):
+def make_dragon(data_dir=None, size=3):
     if data_dir is None:
         data_dir = get_data_dir()
-    filename = join(data_dir, 'dragon_recon/dragon_vrip_res4.ply')
+    filenames = [join(data_dir, 'dragon_recon/dragon_vrip_res4.ply'),
+                 join(data_dir, 'dragon_recon/dragon_vrip_res3.ply'),
+                 join(data_dir, 'dragon_recon/dragon_vrip_res2.ply'),
+                 join(data_dir, 'dragon_recon/dragon_vrip.ply')]
+    filename = filenames[size]
     if not os.path.exists(filename):
         urllib.request.urlretrieve(
             'http://graphics.stanford.edu/pub/3Dscanrep/dragon/dragon_recon.tar.gz',
@@ -206,8 +210,8 @@ def make_gmm_2d_simple():
 
 def make_data(data_source, n_samples):
     if data_source == 'dragon':
-        x, la = make_sphere()
         y, lb = make_dragon()
+        x, la = make_sphere(len(y))
         x *= 2
         y *= 2
         x_sampler = Subsampler(x, la)

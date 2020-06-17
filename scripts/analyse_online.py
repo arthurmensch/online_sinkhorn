@@ -223,7 +223,7 @@ def plot_online(df, ytype='test', epsilon=1e-2, refit=False, name=''):
                   f'epsilon == {epsilon}')
 
     if refit: # Remove saturated memory
-        df.loc[(df['method'] == 'online') & (df['n_samples'] == 40000), ['ref_err_train', 'ref_err_test', 'fixed_err']] = np.nan
+        df.loc[(df['method'] == 'online') & (df['n_samples'] == 40000), ['fixed_err_train', 'fixed_err_test', 'fixed_err']] = np.nan
 
     pk = ['data_source', 'epsilon', 'method', 'refit', 'batch_exp', 'lr_exp', 'batch_size', 'n_iter']
     df = df.groupby(by=pk).agg(['mean', 'std']).reset_index('n_iter')
@@ -231,36 +231,36 @@ def plot_online(df, ytype='test', epsilon=1e-2, refit=False, name=''):
     NAMES = {'gmm_1d': '1D GMM', 'gmm_10d': '10D GMM', 'gmm_2d': '2D GMM'}
 
     df1 = df
-    fig, axes = plt.subplots(1, 3, figsize=(width, width * 0.2))
+    fig, axes = plt.subplots(1, 2, figsize=(width, width * 0.2))
     order = {'gmm_1d': 0, 'gmm_10d': 2, 'gmm_2d': 1}
     for (data_source, epsilon), df2 in df1.groupby(['data_source', 'epsilon']):
         iter_at_prec = {}
         for index, df3 in df2.groupby(['method', 'refit', 'batch_exp', 'lr_exp', 'batch_size']):
             n_calls = df3['n_calls']
             if ytype == 'train':
-                y = df3['ref_err_train']
+                y = df3['fixed_err_train']
             elif ytype == 'test':
-                y = df3['ref_err_test']
+                y = df3['fixed_err_test']
             elif ytype == 'err':
                 y = df3['fixed_err']
             else:
                 raise ValueError
             if index[0] == 'sinkhorn':
-                label = 'Sinkhorn $n = 10^4$'
+                label = f'Sinkhorn $n = 10^5$'
             elif index[0] == 'subsampled':
                 label = f'Sinkhorn $n = {index[-1]}$'
             else:
                 if index[2] == 0:
-                    label = f'O-S $n(t) = 100$'
+                    label = f'O-S $n(t) = {index[-1]}$'
                 else:
-                    label = f'O-S $n(t) \propto t^{{{index[2]}}}$'
+                    label = f'O-S $n(t) \propto {index[-1]} t^{{{index[2]}}}$'
             axes[order[data_source]].plot(n_calls['mean'], y['mean'], label=label, linewidth=2, alpha=0.8)
 
         axes[order[data_source]].annotate(NAMES[data_source], xy=(.5, .83), xycoords="axes fraction",
                          ha='center', va='bottom')
     axes[0].annotate('Computations', xy=(-.3, -.25), xycoords="axes fraction",
                      ha='center', va='bottom')
-    axes[2].legend(loc='center left', frameon=False, bbox_to_anchor=(1.03, 0.5), ncol=1)
+    axes[1].legend(loc='center left', frameon=False, bbox_to_anchor=(1.03, 0.5), ncol=1, fontsize=7)
     for ax in axes:
         ax.set_xscale('log')
         ax.set_yscale('log')
@@ -395,21 +395,26 @@ def plot_gaussian(df, ytype='test', epsilon=1e-2, refit=False):
     fig.subplots_adjust(right=0.75, bottom=0.21)
     fig.savefig(join(get_output_dir(), f'online_{epsilon}_{refit}_{ytype}_gaussian.pdf'))
 
-pipeline = ['random']
+pipeline = ['gather']
+
+# if 'gather' in pipeline:
+#     output_dirs = [join(get_output_dir(), 'online_grid12')]
+#     df = gather(output_dirs)
+#     df.to_pickle(join(get_output_dir(), 'all_warmup.pkl'))
 
 if 'gather' in pipeline:
-    output_dirs = [join(get_output_dir(), 'online_grid12')]
+    output_dirs = [join(get_output_dir(), 'online_grid_big_3')]
     df = gather(output_dirs)
-    df.to_pickle(join(get_output_dir(), 'all_warmup.pkl'))
+    df.to_pickle(join(get_output_dir(), 'all_big_3.pkl'))
 
 # Figure 1
 if 'figure_1' in pipeline:
     output_dirs = [join(get_output_dir(), 'online_grid10'), join(get_output_dir(), 'online_grid11')]
-    df = pd.read_pickle(join(get_output_dir(), 'all.pkl'))
+    df = pd.read_pickle(join(get_output_dir(), 'all_big.pkl'))
     for ytype in ['test']:
         for epsilon in np.logspace(-4, -1, 4):
             for refit in [False, True]:
-                plot_online(df, refit=refit, epsilon=epsilon, ytype=ytype)
+                plot_online(df, refit=refit, epsilon=epsilon, ytype=ytype, name='big')
     del df
 
 if 'random' in pipeline:

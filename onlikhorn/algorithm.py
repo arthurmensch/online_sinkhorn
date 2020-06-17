@@ -1,5 +1,6 @@
+import time
 import warnings
-from typing import Optional, Union, List
+from typing import Optional, Union, List, Tuple
 
 import numpy as np
 import torch
@@ -7,6 +8,7 @@ from pykeops.torch import LazyTensor
 
 from onlikhorn.data import Subsampler
 
+import time
 
 def safe_log(x: float):
     if x == 0:
@@ -19,8 +21,8 @@ def var_norm(v):
     return v.max() - v.min()
 
 
-def compute_distance(x, y, use_pykeops=False):
-    if use_pykeops:
+def compute_distance(x, y, lazy=False):
+    if lazy:
         x = LazyTensor(x[:, None, :])
         y = LazyTensor(y[None, :, :])
         return (((x - y) ** 2) / 2).sum(dim=2)
@@ -44,16 +46,12 @@ def check_idx(n, idx):
 
 
 class BasePotential:
-    def __init__(self, positions: torch.Tensor, weights: torch.tensor, epsilon=1., force_count_compute=False,
-                 use_pykeops=False):
+    def __init__(self, positions: torch.Tensor, weights: torch.tensor, epsilon=1.):
         self.positions = positions
         self.weights = weights
         self.epsilon = epsilon
         self.seen = slice(None)
 
-        self.use_pykeops = use_pykeops
-
-        self.force_count_compute = force_count_compute
 
         self.n_calls_ = 0
 
@@ -64,26 +62,24 @@ class BasePotential:
     def n_samples_(self):
         return len(self.positions[self.seen])
 
-    def __call__(self, positions: torch.tensor = None, C=None, free=False, free_scaling=False, free_compute=False):
+    def __call__(self, positions: torch.tensor = None, C=None, free=False, return_C=False):
         """Evaluation"""
-        use_pykeops = self.positions.device.type == 'cuda' and C is None
-        if free:  # hacks as the implementation of memory persistence is not finished
-            free_scaling = True
-            free_compute = True
+        lazy = self.positions.device.type == 'cuda' and C is None and not return_C
         if C is None:
-            C = compute_distance(positions, self.positions[self.seen], use_pykeops=use_pykeops)
-        elif not self.force_count_compute:
-            free_compute = True
-
-        if not free_compute:
+            C = compute_distance(positions, self.positions[self.seen], lazy=lazy)
+            if not free:
+                self.n_calls_ += C.shape[0] * C.shape[1] * self.positions.shape[1]
+        if not free:
             self.n_calls_ += C.shape[0] * C.shape[1] * self.positions.shape[1]
-        if not free_scaling:
-            self.n_calls_ += C.shape[0] * C.shape[1]
         weights = self.weights[None, self.seen, None]
-        if use_pykeops:
+        if lazy:
             weights = LazyTensor(weights)
         weighted_C = (weights - C) / self.epsilon
-        return - self.epsilon * weighted_C.logsumexp(dim=1)[..., 0]
+        e = - self.epsilon * weighted_C.logsumexp(dim=1)[..., 0]
+        if not return_C:
+            return e
+        else:
+            return e, C
 
     def to(self, device):
         self.weights = self.weights.to(device)
@@ -104,19 +100,18 @@ class BasePotential:
     def refit(self, F, C=None):
         x = self.positions[self.seen]
         la = np.log(x.shape[0])
-        eF = F(x, C=C, free_compute=True) + la
+        eF = F(x, C=C) + la
         fixed_err = var_norm(eF - self.weights[self.seen])
         self.weights[self.seen] = eF
         return fixed_err
 
 
 class FinitePotential(BasePotential):
-    def __init__(self, positions: torch.Tensor, weights: Optional[torch.Tensor] = None, epsilon=1.,
-                 force_count_compute=False):
+    def __init__(self, positions: torch.Tensor, weights: Optional[torch.Tensor] = None, epsilon=1.):
         weights_provided = isinstance(weights, torch.Tensor)
         if not weights_provided:
             weights = torch.full_like(positions[:, 0], fill_value=-float('inf'))
-        super(FinitePotential, self).__init__(positions, weights, epsilon, force_count_compute)
+        super(FinitePotential, self).__init__(positions, weights, epsilon)
         if weights_provided:
             self.seen = slice(None)
         else:
@@ -189,38 +184,47 @@ class InfinitePotential(BasePotential):
 
 
 def subsampled_sinkhorn(x, la, y, lb, n_iter=100, batch_size: int = 10, epsilon=1, save_trace=False, ref=None,
-                        precompute_C=True, count_recompute=False, max_calls=None,):
-    x_sampler = Subsampler(x, la)
-    y_sampler = Subsampler(y, lb)
-    x, la, xidx = x_sampler(batch_size)
-    y, lb, yidx = y_sampler(batch_size)
+                        precompute_C=True, max_calls=None, trace_every=1):
+    if batch_size is not None and (batch_size != len(x) or batch_size != len(y)):
+        x_sampler = Subsampler(x, la)
+        y_sampler = Subsampler(y, lb)
+        x, la, xidx = x_sampler(batch_size)
+        y, lb, yidx = y_sampler(batch_size)
     return sinkhorn(x, la, y, lb, n_iter, epsilon, save_trace=save_trace, ref=ref, precompute_C=precompute_C,
-                    count_recompute=count_recompute, max_calls=max_calls)
+                    max_calls=max_calls, trace_every=trace_every)
 
 
-def sinkhorn(x, la, y, lb, n_iter=100, epsilon=1., save_trace=False, F=None, G=None, precompute_C=True, trace=None,
-             precompute_for_free=False, count_recompute=False, max_calls=None, verbose=True,
+def sinkhorn(x, la, y, lb, n_iter=100, epsilon=1., save_trace=False, F=None, G=None,
+             precompute_C: Union[bool, Tuple[torch.Tensor, torch.Tensor]] = True,
+             trace=None,
+             max_calls=None, verbose=True, trace_every=1,
              ref=None,
-             start_iter=0):
+             start_iter=0, start_time=0):
+    eval_time = 0
+    t0 = time.perf_counter()
     if F is None:
-        F = FinitePotential(y, lb.clone(), epsilon=epsilon, force_count_compute=count_recompute)
+        F = FinitePotential(y, lb.clone(), epsilon=epsilon)
     if G is None:
-        G = FinitePotential(x, la.clone(), epsilon=epsilon, force_count_compute=count_recompute)
+        G = FinitePotential(x, la.clone(), epsilon=epsilon)
 
     if n_iter is None:
         assert max_calls is not None
         n_iter = int(1e6)
 
-    if precompute_C:
-        Cxy = compute_distance(x, y)
-        Cyx = Cxy.transpose(0, 1)
-        if not precompute_for_free and not count_recompute:  # Count compute only once
+    if precompute_C is not False:
+        if precompute_C is True:
+            Cxy = compute_distance(x, y, lazy=False)
+            Cyx = Cxy.transpose(0, 1)
             F.n_calls_ += x.shape[0] * y.shape[0] * x.shape[1]
+        else:
+            Cxy = precompute_C
+            Cyx = Cxy.transpose(0, 1)
     else:
         Cxy, Cyx = None, None
 
     trace, ref = check_trace(save_trace, trace=trace, ref=ref, ref_needed=False)
 
+    call_trace = 0
     for i in range(start_iter, n_iter):
         eG = G(positions=y, C=Cyx)
         if save_trace:
@@ -234,18 +238,28 @@ def sinkhorn(x, la, y, lb, n_iter=100, epsilon=1., save_trace=False, F=None, G=N
         n_samples = F.n_samples_ + G.n_samples_
         if max_calls is not None and n_calls > max_calls:
             break
-        if save_trace:
+        if save_trace and n_calls >= call_trace:
+            eval_t0 = time.perf_counter()
             fixed_err += var_norm(eF + la - G.weights)
             w += (eF * la.exp()).sum()
             this_trace = dict(n_iter=i + 1, n_calls=n_calls, n_samples=n_samples,
                               fixed_err=fixed_err.item(), w=w.item(), algorithm='full')
-            for name, (fr, xr, gr, yr) in ref.items():
-                this_trace[f'ref_err_{name}'] = (var_norm(F(xr, free=True) - fr) + var_norm(G(yr, free=True) - gr)).item()
+            fixed_err, ref_err = evaluate(F, G, epsilon, ref)
+            if torch.cuda.is_available():
+                torch.cuda.synchronize()
+            eval_time += time.perf_counter() - eval_t0
+            if torch.cuda.is_available():
+                torch.cuda.synchronize()
+            this_trace['time'] = time.perf_counter() - t0 - eval_time + start_time
+            for name, err in fixed_err.items():
+                this_trace[f'fixed_err_{name}'] = err
+            for name, err in ref_err.items():
+                this_trace[f'ref_err_{name}'] = err
+
             trace.append(this_trace)
-        else:
-            this_trace = dict(n_iter=i + 1, n_calls=n_calls)
-        if verbose:
-            print(' '.join(f'{k}:{v}' for k, v in this_trace.items()))
+            call_trace = n_calls + trace_every
+            if verbose:
+                print(' '.join(f'{k}:{v:.2e}' if type(v) in [int, float] else f'{k}:{v}' for k, v in this_trace.items()))
         G.push(slice(None), eF + la, override=True)
     anchor = F(torch.zeros_like(x[[0]]))
     F.add_weight(anchor)
@@ -256,16 +270,29 @@ def sinkhorn(x, la, y, lb, n_iter=100, epsilon=1., save_trace=False, F=None, G=N
         return F, G
 
 
+def scatter(target: torch.tensor, xidx: List[int], yidx: List[int], value: torch.tensor):
+    idx = np.concatenate([a[..., None] for a in np.meshgrid(xidx, yidx, indexing='ij')], axis=2).reshape(-1, 2)
+    target[idx[:, 0], idx[:, 1]] = value.reshape(-1)
+
+
 def online_sinkhorn(x_sampler=None, y_sampler=None,
                     x=None, la=None, y=None, lb=None, use_finite=True,
                     epsilon=1., max_length=100000, trim_every=None,
-                    refit=False,
-                    n_iter=100, force_full=True,
-                    batch_sizes: Optional[Union[List[int], int]] = 10, max_calls=None,
+                    refit=False, precompute_C=False,
+                    n_iter=100, force_full=False,
+                    batch_sizes: Optional[Union[List[int], int]] = 10, max_calls=None, verbose=True,
+                    start_time=0,
+                    trace_every=1,
                     lrs: Union[List[float], float] = .1, save_trace=False, ref=None):
+    eval_time = 0
+    t0 = time.perf_counter()
+
     if n_iter is None:
         assert max_calls is not None
         n_iter = int(1e6)
+
+    if force_full:
+        assert use_finite
 
     if not isinstance(batch_sizes, int) or not isinstance(batch_sizes, int):
         if not isinstance(batch_sizes, int):
@@ -288,44 +315,91 @@ def online_sinkhorn(x_sampler=None, y_sampler=None,
             x_sampler = Subsampler(x, la)
         if y_sampler is None:
             y_sampler = Subsampler(y, lb)
-        F = InfinitePotential(max_length=max_length, dimension=y_sampler.dimension, epsilon=epsilon).to(x_sampler.device)
-        G = InfinitePotential(max_length=max_length, dimension=x_sampler.dimension, epsilon=epsilon).to(y_sampler.device)
+        F = InfinitePotential(max_length=max_length, dimension=y_sampler.dimension, epsilon=epsilon).to(
+            x_sampler.device)
+        G = InfinitePotential(max_length=max_length, dimension=x_sampler.dimension, epsilon=epsilon).to(
+            y_sampler.device)
 
     if force_full:  # save for later
         xf, laf, yf, lbf = x, la, y, lb
+        if precompute_C:
+            C = torch.empty((xf.shape[0], yf.shape[0], 1), device=xf.device)
+        else:
+            C = None
     else:
         xf, laf, yf, lbf = None, None, None, None
+        C = None
     # Init
     x, la, xidx = x_sampler(batch_sizes[0])
     y, lb, yidx = y_sampler(batch_sizes[0])
+    if force_full and precompute_C:
+        this_C = compute_distance(x, y, lazy=False)
+        scatter(C[..., 0], xidx, yidx, this_C[..., 0].transpose(0, 1))
+
     F.push(yidx if use_finite else y, la)
     G.push(xidx if use_finite else x, lb)
 
     trace, ref = check_trace(save_trace, ref=ref, ref_needed=True)
 
+    call_trace = 0
     for i in range(n_iter):
         n_calls = F.n_calls_ + G.n_calls_
         n_samples = F.n_samples_ + G.n_samples_
         if max_calls is not None and n_calls > max_calls:
             break
-        if save_trace:
+        if save_trace and n_calls >= call_trace:
+            eval_t0 = time.perf_counter()
             this_trace = dict(n_iter=i, n_calls=n_calls, n_samples=n_samples, algorithm='online')
-            for name, (fr, xr, gr, yr) in ref.items():
-                f = F(xr, free=True)
-                g = G(yr, free=True)
-                this_trace[f'ref_err_{name}'] = (var_norm(f - fr) + var_norm(g - gr)).item()
-
-                gg = FinitePotential(xr, fr - np.log(len(fr)))(yr)
-                ff = FinitePotential(yr, gr - np.log(len(gr)))(xr)
-                this_trace[f'fixed_err_{name}'] = (var_norm(f - ff) + var_norm(g - gg)).item()
-                
+            fixed_err, ref_err = evaluate(F, G, epsilon, ref)
+            if torch.cuda.is_available():
+                torch.cuda.synchronize()
+            eval_time += time.perf_counter() - eval_t0
+            for name, err in fixed_err.items():
+                this_trace[f'fixed_err_{name}'] = err
+            for name, err in ref_err.items():
+                this_trace[f'ref_err_{name}'] = err
+            if torch.cuda.is_available():
+                torch.cuda.synchronize()
+            this_trace['time'] = time.perf_counter() - t0 - eval_time + start_time
             trace.append(this_trace)
-            print(' '.join(f'{k}:{v}' for k, v in this_trace.items()))
-        if use_finite and force_full:
-            if G.full and F.full:  # Force full iterations once every point has been observed
+            call_trace = n_calls + trace_every
+            if verbose:
+                print(' '.join(f'{k}:{v:.2e}' if type(v) in [int, float] else f'{k}:{v}' for k, v in this_trace.items()))
+        y, lb, yidx = y_sampler(batch_sizes[i])
+        if refit:
+            F.push(yidx if use_finite else y, -float('inf'))
+            F.refit(G)
+        else:
+            F.add_weight(safe_log(1 - lrs[i]))
+            if force_full and precompute_C:
+                eG, this_C = G(y, return_C=True)
+                xidx = check_idx(len(G.positions), G.seen)
+                scatter(C[..., 0], xidx, yidx, this_C[..., 0].transpose(0, 1))
+            else:
+                eG = G(y)
+            F.push(yidx if use_finite else y, np.log(lrs[i]) + eG + lb)
+        x, la, xidx = x_sampler(batch_sizes[i])
+        if refit:
+            G.push(xidx if use_finite else x, -float('inf'))
+            G.refit(F)
+        else:
+            G.add_weight(safe_log(1 - lrs[i]))
+            if force_full and precompute_C:
+                eF, this_C = F(x, return_C=True)
+                yidx = check_idx(len(F.positions), F.seen)
+                scatter(C[..., 0], xidx, yidx, this_C[..., 0])
+            else:
+                eF = F(x)
+            G.push(xidx if use_finite else x, np.log(lrs[i]) + eF + la)
+        if not use_finite and trim_every is not None and i % trim_every == 0:
+            G.trim()
+            F.trim()
+
+        if force_full and G.full and F.full:
+                start_time = time.perf_counter() - t0 - eval_time + start_time
                 res = sinkhorn(xf, laf, yf, lbf, F=F, G=G, save_trace=save_trace, trace=trace, start_iter=i,
-                               n_iter=n_iter - 1, ref=ref, precompute_C=True, precompute_for_free=True,
-                               # A better implementation would not require to recompute C
+                               n_iter=n_iter - 1, ref=ref, precompute_C=C if precompute_C else False,
+                               max_calls=max_calls, trace_every=trace_every, start_time=start_time,
                                epsilon=epsilon)
                 if save_trace:
                     F, G, trace = res
@@ -333,23 +407,6 @@ def online_sinkhorn(x_sampler=None, y_sampler=None,
                     F, G = res
                 break
 
-        y, lb, yidx = y_sampler(batch_sizes[i])
-        if refit:
-            F.push(yidx if use_finite else y, -float('inf'))
-            F.refit(G)
-        else:
-            F.add_weight(safe_log(1 - lrs[i]))
-            F.push(yidx if use_finite else y, np.log(lrs[i]) + G(y) + lb)
-        x, la, xidx = x_sampler(batch_sizes[i])
-        if refit:
-            G.push(xidx if use_finite else x, -float('inf'))
-            G.refit(F)
-        else:
-            G.add_weight(safe_log(1 - lrs[i]))
-            G.push(xidx if use_finite else x, np.log(lrs[i]) + F(x) + la)
-        if not use_finite and trim_every is not None and i % trim_every == 0:
-            G.trim()
-            F.trim()
     anchor = F(torch.zeros_like(x[[0]]))
     F.add_weight(anchor)
     G.add_weight(-anchor)
@@ -357,6 +414,21 @@ def online_sinkhorn(x_sampler=None, y_sampler=None,
         return F, G, trace
     else:
         return F, G
+
+
+def evaluate(F, G, epsilon, ref):
+    ref_err = {}
+    fixed_err = {}
+    for name, (fr, xr, gr, yr) in ref.items():
+        f = F(xr, free=True)
+        g = G(yr, free=True)
+        if fr is not None and gr is not None:
+            ref_err[name] = (var_norm(f - fr) + var_norm(g - gr)).item()
+
+        gg = FinitePotential(xr, f - np.log(len(f)), epsilon=epsilon)(yr)
+        ff = FinitePotential(yr, g - np.log(len(g)), epsilon=epsilon)(xr)
+        fixed_err[name] = (var_norm(f - ff) + var_norm(g - gg)).item()
+    return fixed_err, ref_err
 
 
 def check_trace(save_trace=False, trace=None, ref=None, ref_needed=False):
@@ -374,8 +446,11 @@ def check_trace(save_trace=False, trace=None, ref=None, ref_needed=False):
 
 
 def random_sinkhorn(x_sampler=None, y_sampler=None, x=None, la=None, y=None, lb=None, use_finite=True, n_iter=100,
-                    epsilon=1, max_calls=None,
-                    batch_sizes: Union[List[int], int] = 10, save_trace=False, ref=None):
+                    epsilon=1, max_calls=None, start_time=0,
+                    batch_sizes: Union[List[int], int] = 10, save_trace=False, ref=None, verbose=True,
+                    trace_every=1):
+    eval_time = 0
+    t0 = time.perf_counter()
     trace, ref = check_trace(save_trace, ref=ref, ref_needed=True)
 
     if n_iter is None:
@@ -391,6 +466,7 @@ def random_sinkhorn(x_sampler=None, y_sampler=None, x=None, la=None, y=None, lb=
         y_sampler = Subsampler(y, lb)
     F, G = None, None
     n_calls = 0
+    call_trace = 0
     for i in range(n_iter):
         if max_calls is not None and n_calls > max_calls:
             break
@@ -402,12 +478,24 @@ def random_sinkhorn(x_sampler=None, y_sampler=None, x=None, la=None, y=None, lb=
         G = FinitePotential(x, eF + la, epsilon=epsilon)
         n_samples = F.n_samples_ + G.n_samples_
         n_calls += F.n_calls_ + G.n_calls_
-        if save_trace:
+        if save_trace and n_calls >= call_trace:
             this_trace = dict(n_iter=i + 1, n_calls=n_calls, n_samples=n_samples, algorithm='random')
-            for name, (fr, xr, gr, yr) in ref.items():
-                this_trace[f'ref_err_{name}'] = (var_norm(F(xr, free=True) - fr) + var_norm(G(yr, free=True) - gr)).item()
-            print(' '.join(f'{k}:{v}' for k, v in this_trace.items()))
+            eval_t0 = time.perf_counter()
+            fixed_err, ref_err = evaluate(F, G, epsilon, ref)
+            if torch.cuda.is_available():
+                torch.cuda.synchronize()
+            eval_time += time.perf_counter() - eval_t0
+            for name, err in fixed_err.items():
+                this_trace[f'fixed_err_{name}'] = err
+            for name, err in ref_err.items():
+                this_trace[f'ref_err_{name}'] = err
+            if torch.cuda.is_available():
+                torch.cuda.synchronize()
+            this_trace['time'] = time.perf_counter() - t0 - eval_time + start_time
             trace.append(this_trace)
+            call_trace = n_calls + trace_every
+            if verbose:
+                print(' '.join(f'{k}:{v:.2e}' if type(v) in [int, float] else f'{k}:{v}' for k, v in this_trace.items()))
     if save_trace:
         return F, G, trace
     else:
@@ -415,7 +503,8 @@ def random_sinkhorn(x_sampler=None, y_sampler=None, x=None, la=None, y=None, lb=
 
 
 def schedule(batch_exp, batch_size, lr, lr_exp, max_length, n_iter, refit, iota=.1):
-    batch_sizes = np.ceil(batch_size * np.float_power(1 + 0.1 * np.arange(n_iter, dtype=float), batch_exp)).astype(int)  # Those are important hyperparameters...
+    batch_sizes = np.ceil(batch_size * np.float_power(1 + 0.1 * np.arange(n_iter, dtype=float), batch_exp)).astype(
+        int)  # Those are important hyperparameters...
     batch_sizes[batch_sizes > max_length] = max_length
     batch_sizes = batch_sizes.tolist()
     if lr_exp == 'auto':

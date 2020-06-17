@@ -17,7 +17,7 @@ SLURM_TEMPLATE = """#!/bin/env bash
 #SBATCH --mem-per-cpu=20G
 #SBATCH --hint=nomultithread
 
-#SBATCH --time=2:00:00
+#SBATCH --time=1:00:00
 #SBATCH --output=%x_%A_%a.out
 #SBATCH --error=%x_%A_%a.out
 
@@ -47,40 +47,35 @@ def create_one(config, index=0):
     return filename
 
 
-grid = 'quiver'
+grid = 'online'
 
 if grid == 'online':
     n_seeds = 3
     seeds = list(range(n_seeds))
     epsilons = [1e-4, 1e-3, 1e-2, 1e-1]
-    data_sources = ['gmm_1d', 'gmm_2d', 'gmm_10d']
+    data_sources = ['gmm_1d', 'gmm_2d', 'gmm_10d', 'gaussian_2d']
     reference = ParameterGrid({'data_source': data_sources,
                                'seed': seeds,
+                               'batch_size': [1000, 10000, None],
                                'epsilon': epsilons,
                                'method': ['sinkhorn'],
                                })
-    subsampled = ParameterGrid({'data_source': data_sources,
-                                'batch_size': [100, 1000],
-                                'seed': seeds,
-                                'epsilon': epsilons,
-                                'method': ['subsampled'],
-                                })
     random = ParameterGrid({'data_source': data_sources,
-                            'batch_size': [100, 1000],
+                            'batch_size': [1000, 10000],
                             'seed': seeds,
                             'epsilon': epsilons,
                             'method': ['random'],
                             })
     online_non_convergent = ParameterGrid({'data_source': data_sources,
-                                           'batch_size': [100],
+                                           'batch_size': [1000, 10000],
                                            'seed': seeds,
                                            'epsilon': epsilons,
                                            'method': ['online'],
-                                           'refit': [False, True],
+                                           'refit': [True, False],
                                            'batch_exp': [0],
                                            'lr_exp': [0, .5, 1]})
     online = ParameterGrid({'data_source': data_sources,
-                            'batch_size': [100],
+                            'batch_size': [1000, 10000],
                             'seed': seeds,
                             'epsilon': epsilons,
                             'method': ['online'],
@@ -88,7 +83,7 @@ if grid == 'online':
                             'batch_exp': [0, .5, 1],
                             'lr_exp': ['auto']})
     #
-    grids = [reference, subsampled, random, online_non_convergent, online]
+    grids = [reference, random, online_non_convergent, online]
 
 
 # Dragon online warmup
@@ -100,14 +95,16 @@ elif grid == 'warmup':
     reference = ParameterGrid({'data_source': data_sources,
                                'seed': seeds,
                                'epsilon': epsilons,
-                               'method': ['sinkhorn_precompute'],
+                               'method': ['sinkhorn'],
                                })
     online = ParameterGrid({'data_source': data_sources,
                             'batch_size': [100, 1000],
                             'seed': seeds,
                             'epsilon': epsilons,
-                            'method': ['online_as_warmup'],
-                            'refit': [False, True],
+                            'method': ['online'],
+                            'force_full': [True],
+                            'precompute_C': [True, False],
+                            'refit': [False],
                             'batch_exp': [0, .5],
                             'lr_exp': [0, .5, 1]})
 
