@@ -403,9 +403,9 @@ pipeline = ['gather']
 #     df.to_pickle(join(get_output_dir(), 'all_warmup.pkl'))
 
 if 'gather' in pipeline:
-    output_dirs = [join(get_output_dir(), 'online_grid_big_3')]
+    output_dirs = [join(get_output_dir(), 'online_grid_big_5')]
     df = gather(output_dirs)
-    df.to_pickle(join(get_output_dir(), 'all_big_3.pkl'))
+    df.to_pickle(join(get_output_dir(), 'all_big_5.pkl'))
 
 # Figure 1
 if 'figure_1' in pipeline:

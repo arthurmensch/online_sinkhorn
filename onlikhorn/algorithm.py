@@ -251,6 +251,7 @@ def sinkhorn(x, la, y, lb, n_iter=100, epsilon=1., save_trace=False, F=None, G=N
             if torch.cuda.is_available():
                 torch.cuda.synchronize()
             this_trace['time'] = time.perf_counter() - t0 - eval_time + start_time
+            this_trace['eval_time'] = eval_time
             for name, err in fixed_err.items():
                 this_trace[f'fixed_err_{name}'] = err
             for name, err in ref_err.items():
@@ -361,6 +362,7 @@ def online_sinkhorn(x_sampler=None, y_sampler=None,
             if torch.cuda.is_available():
                 torch.cuda.synchronize()
             this_trace['time'] = time.perf_counter() - t0 - eval_time + start_time
+            this_trace['eval_time'] = eval_time
             trace.append(this_trace)
             call_trace = n_calls + trace_every
             if verbose:
@@ -492,6 +494,7 @@ def random_sinkhorn(x_sampler=None, y_sampler=None, x=None, la=None, y=None, lb=
             if torch.cuda.is_available():
                 torch.cuda.synchronize()
             this_trace['time'] = time.perf_counter() - t0 - eval_time + start_time
+            this_trace['eval_time'] = eval_time
             trace.append(this_trace)
             call_trace = n_calls + trace_every
             if verbose:

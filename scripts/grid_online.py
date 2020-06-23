@@ -53,7 +53,7 @@ if grid == 'online':
     n_seeds = 3
     seeds = list(range(n_seeds))
     epsilons = [1e-4, 1e-3, 1e-2, 1e-1]
-    data_sources = ['gmm_1d', 'gmm_2d', 'gmm_10d', 'gaussian_2d']
+    data_sources = ['gmm_1d', 'gmm_2d', 'gmm_10d', 'gaussian_2d', 'gaussian_10d']
     reference = ParameterGrid({'data_source': data_sources,
                                'seed': seeds,
                                'batch_size': [1000, 10000, None],

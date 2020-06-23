@@ -209,11 +209,10 @@ def make_gmm_2d_simple():
 
 
 def make_data(data_source, n_samples):
-    if data_source == 'dragon':
-        y, lb = make_dragon()
+    if 'dragon' in data_source:
+        _, size = data_source.split('_')
+        y, lb = make_dragon(size=int(size))
         x, la = make_sphere(len(y))
-        x *= 2
-        y *= 2
         x_sampler = Subsampler(x, la)
         y_sampler = Subsampler(y, lb)
     else:
