@@ -52,7 +52,6 @@ class BasePotential:
         self.epsilon = epsilon
         self.seen = slice(None)
 
-
         self.n_calls_ = 0
 
     def add_weight(self, weight):
@@ -104,6 +103,24 @@ class BasePotential:
         fixed_err = var_norm(eF - self.weights[self.seen])
         self.weights[self.seen] = eF
         return fixed_err
+
+class ConvolutionPotential(BasePotential):
+    def __call__(self, positions: torch.tensor = None, C=None, free=False, return_C=False):
+        res = super(ConvolutionPotential, self).__call__(positions, C, free, return_C)
+        if return_C:
+            e, C = res
+            return torch.exp(- e / self.epsilon), C
+        else:
+            e = res
+            return torch.exp(- e / self.epsilon)
+
+class PotentialDifference:
+    def __init__(self, potential_1, potential_2):
+        self.potential_1 = potential_1
+        self.potential_2 = potential_2
+
+    def __call__(self, positions):
+        return self.potential_1(positions) - self.potential_2(positions)
 
 
 class FinitePotential(BasePotential):
@@ -193,6 +210,11 @@ def subsampled_sinkhorn(x, la, y, lb, n_iter=100, batch_size: int = 10, epsilon=
     return sinkhorn(x, la, y, lb, n_iter, epsilon, save_trace=save_trace, ref=ref, precompute_C=precompute_C,
                     max_calls=max_calls, trace_every=trace_every)
 
+
+def gaussian_convolution(x, la, y, lb, epsilon):
+    g = ConvolutionPotential(x, la * epsilon, epsilon=epsilon)
+    f = ConvolutionPotential(y, lb * epsilon, epsilon=epsilon)
+    return PotentialDifference(g, f), PotentialDifference(f, g)
 
 def sinkhorn(x, la, y, lb, n_iter=100, epsilon=1., save_trace=False, F=None, G=None,
              precompute_C: Union[bool, Tuple[torch.Tensor, torch.Tensor]] = True,
@@ -517,3 +539,10 @@ def schedule(batch_exp, batch_size, lr, lr_exp, max_length, n_iter, refit, iota=
             lr_exp = min(max(0, 1 - (batch_exp + 1) / 2 + iota), 1)
     lrs = (lr * np.float_power(1 + 0.1 * np.arange(n_iter, dtype=float), -lr_exp)).tolist()
     return batch_sizes, lrs, lr_exp
+
+
+def compute_grad(potential, z):
+    z = z.clone()
+    z.requires_grad = True
+    grad, = torch.autograd.grad(potential(z).sum(), (z,))
+    return grad.detach()

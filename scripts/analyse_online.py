@@ -5,7 +5,7 @@ from os.path import join
 import torch
 
 import pandas as pd
-from matplotlib.ticker import AutoMinorLocator
+from onlikhorn.algorithm import compute_grad
 
 from onlikhorn.dataset import get_output_dir, make_gmm_2d
 
@@ -63,13 +63,6 @@ def make_2d_grid(shape):
     Z = np.concatenate([X[:, :, None], Y[:, :, None]], axis=2).reshape(-1, 2)
     Z = torch.from_numpy(Z).float()
     return Z
-
-
-def compute_grad(potential, z):
-    z = z.clone()
-    z.requires_grad = True
-    grad, = torch.autograd.grad(potential(z).sum(), (z,))
-    return - grad.detach()
 
 
 def get_ids(df):

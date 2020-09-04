@@ -24,9 +24,10 @@ SLURM_TEMPLATE = """#!/bin/env bash
 #SBATCH --partition=gpu_p2
 #SBATCH --qos=qos_gpu-t3
 #SBATCH -A glp@gpu
-#SBATCH --array=0-{nb_jobs}
+#SBATCH --array=0-100
 
 source load_modules
+
 cfg=$(cat {config_file} | head -${{SLURM_ARRAY_TASK_ID}} | tail -1) 
 
 python {project_root}/online.py with ${{cfg}}
